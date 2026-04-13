@@ -75,19 +75,24 @@ async function salvarMensagem(clienteId, mensagemCliente, respostaIA, status = '
  */
 async function listarConversas() {
   try {
+    // Sem orderBy para evitar exigência de índice composto no Firestore
+    // Ordenação feita em memória após busca
     const snapshot = await db
       .collection(COLECAO)
-      .orderBy('atualizadoEm', 'desc')
       .limit(100)
       .get();
 
-    return snapshot.docs.map((doc) => ({
+    const conversas = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
-      // Remove histórico completo para não sobrecarregar a listagem
-      historico: undefined,
+      historico: undefined, // Remove histórico para não sobrecarregar a listagem
       totalMensagens: (doc.data().historico || []).length,
     }));
+
+    // Ordena por atualizadoEm decrescente em memória
+    return conversas.sort((a, b) =>
+      (b.atualizadoEm || '').localeCompare(a.atualizadoEm || '')
+    );
   } catch (error) {
     console.error('[Conversa] Erro ao listar conversas:', error.message);
     throw error;
