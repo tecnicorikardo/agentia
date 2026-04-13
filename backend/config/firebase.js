@@ -1,15 +1,13 @@
 const admin = require('firebase-admin');
+const path = require('path');
 
-// Inicializa o Firebase Admin SDK com variáveis de ambiente
-const serviceAccount = {
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-};
+// Caminho absoluto para o JSON de credenciais na raiz do projeto
+// backend/config/firebase.js → ../../ = raiz do projeto (agentia/)
+const credentialPath = path.join(__dirname, '..', '..', 'agentai-5585e-firebase-adminsdk-fbsvc-9363b22edd.json');
 
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+    credential: admin.credential.cert(require(credentialPath)),
   });
 }
 

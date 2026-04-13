@@ -1,4 +1,4 @@
-Sempre salvar no github, criei agora este repositório https://github.com/tecnicorikardo/agentia
+Sempre salvar no github, https://github.com/tecnicorikardo/agentia
 
 
 

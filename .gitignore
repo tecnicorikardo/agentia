@@ -1,0 +1,10 @@
+# Credenciais sensíveis — NUNCA versionar
+*.json
+!backend/package.json
+!backend/package-lock.json
+api.md
+backend/.env
+
+# Node
+node_modules/
+*.log
