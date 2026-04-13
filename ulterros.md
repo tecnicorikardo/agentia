@@ -46,3 +46,27 @@ node -e "require('dotenv').config(); const { db } = require('./config/firebase')
 ### Próximo passo obrigatório
 Ativar o Firestore no projeto:
 👉 https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=agentai-5585e
+
+---
+
+## [3] Fix: Erro "Falha ao buscar conversas" no GET /conversations
+
+### Problema
+A rota `GET /conversations` retornava `{"erro":"Falha ao buscar conversas"}`.
+
+### Causa
+O Firestore exige criação manual de **índice composto** quando se usa `.orderBy()` em coleções que ainda não têm esse índice configurado no console do Firebase.
+
+### Solução aplicada
+
+**Arquivo:** `backend/services/conversationService.js` — função `listarConversas()`
+
+Removido o `.orderBy('atualizadoEm', 'desc')` da query do Firestore.
+Substituído por ordenação em memória com `.sort()` após buscar os documentos.
+
+### Validação
+```powershell
+# Reinicia o servidor e testa
+Invoke-RestMethod -Uri "http://localhost:3000/conversations" -Method GET
+```
+Resposta esperada: `{ total: N, conversas: [...] }`

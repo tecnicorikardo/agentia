@@ -1,20 +1,14 @@
 const { db } = require('../config/firebase');
 
 const COLECAO = 'conversas';
-const MAX_HISTORICO = 20; // Limita histórico para não estourar tokens
+const MAX_HISTORICO = 20;
 
-/**
- * Busca ou cria uma conversa para o cliente
- * @param {string} clienteId - Número do WhatsApp do cliente
- * @returns {Promise<Object>} - Dados da conversa
- */
 async function buscarConversa(clienteId) {
   try {
     const docRef = db.collection(COLECAO).doc(clienteId);
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      // Cria nova conversa
       const novaConversa = {
         clienteId,
         historico: [],
@@ -33,13 +27,6 @@ async function buscarConversa(clienteId) {
   }
 }
 
-/**
- * Salva nova mensagem no histórico e atualiza status
- * @param {string} clienteId
- * @param {string} mensagemCliente
- * @param {string} respostaIA
- * @param {string} status - 'novo' | 'interessado' | 'negociando' | 'fechado'
- */
 async function salvarMensagem(clienteId, mensagemCliente, respostaIA, status = 'interessado') {
   try {
     const docRef = db.collection(COLECAO).doc(clienteId);
@@ -47,12 +34,9 @@ async function salvarMensagem(clienteId, mensagemCliente, respostaIA, status = '
     const dados = doc.exists ? doc.data() : { historico: [] };
 
     const historico = dados.historico || [];
-
-    // Adiciona as novas mensagens
     historico.push({ role: 'user', content: mensagemCliente });
     historico.push({ role: 'assistant', content: respostaIA });
 
-    // Mantém apenas as últimas MAX_HISTORICO mensagens (evita custo excessivo de tokens)
     const historicoLimitado = historico.slice(-MAX_HISTORICO);
 
     await docRef.set(
@@ -69,27 +53,19 @@ async function salvarMensagem(clienteId, mensagemCliente, respostaIA, status = '
   }
 }
 
-/**
- * Lista todas as conversas (para painel administrativo)
- * @returns {Promise<Array>}
- */
 async function listarConversas() {
   try {
-    // Sem orderBy para evitar exigência de índice composto no Firestore
-    // Ordenação feita em memória após busca
-    const snapshot = await db
-      .collection(COLECAO)
-      .limit(100)
-      .get();
+    // SEM orderBy — evita exigência de índice composto no Firestore
+    // Ordenação feita em memória após a busca
+    const snapshot = await db.collection(COLECAO).limit(100).get();
 
     const conversas = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
-      historico: undefined, // Remove histórico para não sobrecarregar a listagem
+      historico: undefined,
       totalMensagens: (doc.data().historico || []).length,
     }));
 
-    // Ordena por atualizadoEm decrescente em memória
     return conversas.sort((a, b) =>
       (b.atualizadoEm || '').localeCompare(a.atualizadoEm || '')
     );
@@ -99,18 +75,11 @@ async function listarConversas() {
   }
 }
 
-/**
- * Detecta intenção do cliente para ajustar estratégia de venda
- * @param {string} mensagem
- * @returns {string} - 'preco' | 'interesse' | 'pedido' | 'geral'
- */
 function detectarIntencao(mensagem) {
   const texto = mensagem.toLowerCase();
-
-  if (/quanto custa|preço|valor|promoção|desconto/.test(texto)) return 'preco';
+  if (/quanto custa|pre[cç]o|valor|promo[cç][aã]o|desconto/.test(texto)) return 'preco';
   if (/quero|gostei|me interessa|comprar|pedir/.test(texto)) return 'pedido';
-  if (/tem|existe|disponível|opções|catálogo/.test(texto)) return 'interesse';
-
+  if (/tem|existe|dispon[ií]vel|op[cç][oõ]es|cat[aá]logo/.test(texto)) return 'interesse';
   return 'geral';
 }
 
