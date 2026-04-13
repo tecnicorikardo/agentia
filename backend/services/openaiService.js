@@ -1,13 +1,13 @@
-const OpenAI = require('openai');
+const Groq = require('groq-sdk');
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// Prompt base do vendedor profissional
 const SYSTEM_PROMPT = `Você é um vendedor profissional, simpático e persuasivo chamado "Max".
 Seu objetivo é ajudar o cliente a encontrar o produto ideal e conduzi-lo ao fechamento da venda.
 
 Diretrizes:
 - Seja natural, amigável e nunca robótico
+- Responda SEMPRE em português brasileiro
 - Faça perguntas para entender a necessidade do cliente
 - Sugira produtos relevantes com base no interesse demonstrado
 - Aplique técnicas de upsell quando apropriado (ex: "Que tal levar o combo e economizar?")
@@ -17,10 +17,10 @@ Diretrizes:
 - Nunca invente preços ou produtos que não foram informados no contexto`;
 
 /**
- * Envia mensagens para a OpenAI e retorna a resposta do vendedor
- * @param {Array} historico - Array de mensagens no formato [{role, content}]
- * @param {string} contextoLoja - Informações dos produtos disponíveis
- * @returns {Promise<string>} - Resposta gerada pela IA
+ * Gera resposta usando Groq (Llama 3.3 70B) — gratuito e ultra-rápido
+ * @param {Array} historico - Array de mensagens [{role, content}]
+ * @param {string} contextoLoja - Produtos disponíveis
+ * @returns {Promise<string>}
  */
 async function gerarResposta(historico, contextoLoja = '') {
   try {
@@ -33,16 +33,16 @@ async function gerarResposta(historico, contextoLoja = '') {
       ...historico,
     ];
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
       messages,
       max_tokens: 300,
-      temperature: 0.8, // Respostas mais naturais e variadas
+      temperature: 0.8,
     });
 
     return completion.choices[0].message.content.trim();
   } catch (error) {
-    console.error('[OpenAI] Erro ao gerar resposta:', error.message);
+    console.error('[Groq] Erro ao gerar resposta:', error.message);
     throw new Error('Falha ao processar resposta da IA');
   }
 }
