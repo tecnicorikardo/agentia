@@ -22,7 +22,7 @@ async function enviarMensagem(numero, mensagem) {
       `${BASE_URL}/message/sendText/${INSTANCE}`,
       {
         number: numero,
-        text: mensagem,
+        textMessage: { text: mensagem },
       },
       {
         headers: {
