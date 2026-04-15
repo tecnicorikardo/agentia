@@ -38,6 +38,9 @@ function extrairDadosWebhook(payload) {
     const data = payload?.data || payload;
     if (!data) return null;
 
+    // Log resumido para debug
+    console.log('[WhatsApp] remoteJid:', data?.key?.remoteJid, '| fromMe:', data?.key?.fromMe, '| sender:', payload?.sender, '| tipo:', data?.messageType);
+
     const tipo = data?.messageType;
     if (tipo !== 'conversation' && tipo !== 'extendedTextMessage') return null;
 
