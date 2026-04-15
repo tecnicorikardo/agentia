@@ -54,6 +54,7 @@ async function enviarMensagem(numero, mensagem) {
  */
 function extrairDadosWebhook(payload) {
   try {
+    console.log('[WhatsApp] Payload recebido:', JSON.stringify(payload).substring(0, 500));
     const data = payload?.data || payload;
     if (!data) return null;
 
@@ -72,14 +73,19 @@ function extrairDadosWebhook(payload) {
     const remoteJid = data?.key?.remoteJid || '';
     let numero;
     if (remoteJid.includes('@lid')) {
-      // sender contém o número real: "5521994655341@s.whatsapp.net"
-      numero = payload?.sender?.replace('@s.whatsapp.net', '') ||
-               payload?.data?.sender?.replace('@s.whatsapp.net', '');
+      // sender é quem enviou a mensagem — é para quem devemos responder
+      const sender = payload?.sender || payload?.data?.sender || '';
+      numero = sender.replace('@s.whatsapp.net', '');
     } else {
       numero = remoteJid.replace('@s.whatsapp.net', '');
     }
 
-    if (!numero) return null;
+    // Garante que não é o próprio número conectado
+    const senderConectado = (payload?.sender || '').replace('@s.whatsapp.net', '');
+    if (numero === senderConectado && !remoteJid.includes('@lid')) {
+      console.log('[WhatsApp] Ignorando mensagem do próprio número conectado');
+      return null;
+    }
 
     console.log(`[WhatsApp] Mensagem de ${numero}: "${mensagem}"`);
     return { numero, mensagem };
