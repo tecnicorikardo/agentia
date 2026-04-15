@@ -54,36 +54,34 @@ async function enviarMensagem(numero, mensagem) {
  */
 function extrairDadosWebhook(payload) {
   try {
-    // Loga payload completo para debug
-    console.log('[WhatsApp] Payload recebido:', JSON.stringify(payload, null, 2));
-
-    // Evolution API v1 envia: { event, instance, data: { key, messageType, message, ... } }
-    // Tenta estrutura v1 primeiro, depois v2
     const data = payload?.data || payload;
     if (!data) return null;
 
     const tipo = data?.messageType;
-    if (tipo !== 'conversation' && tipo !== 'extendedTextMessage') {
-      console.log('[WhatsApp] Tipo de mensagem ignorado:', tipo);
-      return null;
-    }
+    if (tipo !== 'conversation' && tipo !== 'extendedTextMessage') return null;
 
-    const numero = data?.key?.remoteJid?.replace('@s.whatsapp.net', '');
+    // Ignora mensagens enviadas pelo próprio bot
+    if (data?.key?.fromMe) return null;
+
     const mensagem =
       data?.message?.conversation ||
       data?.message?.extendedTextMessage?.text;
+    if (!mensagem) return null;
 
-    // Ignora mensagens enviadas pelo próprio bot
-    const fromMe = data?.key?.fromMe;
-    if (fromMe) {
-      console.log('[WhatsApp] Mensagem própria ignorada');
-      return null;
-    }
-    if (!numero || !mensagem) {
-      console.log('[WhatsApp] Número ou mensagem ausente:', { numero, mensagem });
-      return null;
+    // Usa o sender (número real) se remoteJid for @lid (ID interno do WhatsApp)
+    const remoteJid = data?.key?.remoteJid || '';
+    let numero;
+    if (remoteJid.includes('@lid')) {
+      // sender contém o número real: "5521994655341@s.whatsapp.net"
+      numero = payload?.sender?.replace('@s.whatsapp.net', '') ||
+               payload?.data?.sender?.replace('@s.whatsapp.net', '');
+    } else {
+      numero = remoteJid.replace('@s.whatsapp.net', '');
     }
 
+    if (!numero) return null;
+
+    console.log(`[WhatsApp] Mensagem de ${numero}: "${mensagem}"`);
     return { numero, mensagem };
   } catch (error) {
     console.error('[WhatsApp] Erro ao extrair dados do webhook:', error.message);
