@@ -15,6 +15,12 @@ const tempoAleatorio = () => Math.floor(Math.random() * 2000) + 1000;
  */
 async function enviarMensagem(numero, mensagem) {
   try {
+    // Ignora números com @lid (IDs internos do WhatsApp — não são enviáveis)
+    if (!numero || numero.includes('@') || numero.length < 10) {
+      console.log(`[WhatsApp] Número inválido ignorado: ${numero}`);
+      return null;
+    }
+
     // Simula digitação humana antes de responder
     await delayHumano(tempoAleatorio());
 
@@ -36,7 +42,7 @@ async function enviarMensagem(numero, mensagem) {
     console.log(`[WhatsApp] Mensagem enviada para ${numero}`);
     return response.data;
   } catch (error) {
-    console.error('[WhatsApp] Erro ao enviar mensagem:', error.message);
+    console.error('[WhatsApp] Erro ao enviar mensagem:', error.response?.data || error.message);
     throw new Error('Falha ao enviar mensagem via WhatsApp');
   }
 }
