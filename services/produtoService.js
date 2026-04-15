@@ -32,27 +32,12 @@ async function obterContextoProdutos() {
  */
 async function seedProdutos() {
   const produtos = [
-    {
-      nome: 'Plano Básico',
-      preco: 97.0,
-      descricao: 'Acesso a funcionalidades essenciais por 30 dias',
-      categoria: 'assinatura',
-      ativo: true,
-    },
-    {
-      nome: 'Plano Pro',
-      preco: 197.0,
-      descricao: 'Acesso completo com suporte prioritário por 30 dias',
-      categoria: 'assinatura',
-      ativo: true,
-    },
-    {
-      nome: 'Plano Anual',
-      preco: 997.0,
-      descricao: 'Acesso completo por 12 meses com 40% de desconto',
-      categoria: 'assinatura',
-      ativo: true,
-    },
+    { nome: 'Parmegiana', preco: 24.90, descricao: 'Marmita de parmegiana', categoria: 'marmita', ativo: true },
+    { nome: 'Filé de frango empanado', preco: 21.90, descricao: 'Marmita de filé de frango empanado', categoria: 'marmita', ativo: true },
+    { nome: 'Macarrão penne com cheddar', preco: 23.90, descricao: 'Marmita de macarrão penne com cheddar', categoria: 'marmita', ativo: true },
+    { nome: 'Açaí 300ml', preco: 11.00, descricao: 'Açaí gourmet 300ml', categoria: 'gelado', ativo: true },
+    { nome: 'Sacolé gourmet Nutella', preco: 8.00, descricao: 'Sacolé gourmet sabor Nutella', categoria: 'gelado', ativo: true },
+    { nome: 'Sacolé gourmet Chocolate', preco: 8.00, descricao: 'Sacolé gourmet sabor Chocolate', categoria: 'gelado', ativo: true },
   ];
 
   for (const produto of produtos) {
