@@ -48,12 +48,19 @@ async function enviarMensagem(numero, mensagem) {
  */
 function extrairDadosWebhook(payload) {
   try {
-    // Estrutura padrão da Evolution API v2
-    const data = payload?.data;
+    // Loga payload completo para debug
+    console.log('[WhatsApp] Payload recebido:', JSON.stringify(payload, null, 2));
+
+    // Evolution API v1 envia: { event, instance, data: { key, messageType, message, ... } }
+    // Tenta estrutura v1 primeiro, depois v2
+    const data = payload?.data || payload;
     if (!data) return null;
 
     const tipo = data?.messageType;
-    if (tipo !== 'conversation' && tipo !== 'extendedTextMessage') return null;
+    if (tipo !== 'conversation' && tipo !== 'extendedTextMessage') {
+      console.log('[WhatsApp] Tipo de mensagem ignorado:', tipo);
+      return null;
+    }
 
     const numero = data?.key?.remoteJid?.replace('@s.whatsapp.net', '');
     const mensagem =
@@ -62,7 +69,14 @@ function extrairDadosWebhook(payload) {
 
     // Ignora mensagens enviadas pelo próprio bot
     const fromMe = data?.key?.fromMe;
-    if (fromMe || !numero || !mensagem) return null;
+    if (fromMe) {
+      console.log('[WhatsApp] Mensagem própria ignorada');
+      return null;
+    }
+    if (!numero || !mensagem) {
+      console.log('[WhatsApp] Número ou mensagem ausente:', { numero, mensagem });
+      return null;
+    }
 
     return { numero, mensagem };
   } catch (error) {
