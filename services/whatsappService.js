@@ -9,23 +9,26 @@ const tempoAleatorio = () => Math.floor(Math.random() * 2000) + 1000;
 
 async function enviarMensagem(numero, mensagem) {
   try {
-    if (!numero || numero.includes('@') || numero.length < 10) {
+    if (!numero || numero.length < 8) {
       console.log(`[WhatsApp] Número inválido ignorado: ${numero}`);
       return null;
     }
 
     await delayHumano(tempoAleatorio());
 
+    // Se for @lid, envia direto com o JID completo
+    const destino = numero.includes('@') ? numero : numero;
+
     const response = await axios.post(
       `${BASE_URL}/message/sendText/${INSTANCE}`,
-      { number: numero, textMessage: { text: mensagem } },
+      { number: destino, textMessage: { text: mensagem } },
       {
         headers: { apikey: API_KEY, 'Content-Type': 'application/json' },
         timeout: 10000,
       }
     );
 
-    console.log(`[WhatsApp] Mensagem enviada para ${numero}`);
+    console.log(`[WhatsApp] Mensagem enviada para ${destino}`);
     return response.data;
   } catch (error) {
     console.error('[WhatsApp] Erro ao enviar mensagem:', error.response?.data || error.message);
@@ -64,27 +67,13 @@ function extrairDadosWebhook(payload) {
       data?.message?.extendedTextMessage?.text;
     if (!mensagem) return null;
 
-    // remoteJid quando fromMe=false é quem mandou a mensagem
-    // MAS na Evolution API v1, em alguns casos o remoteJid é o próprio bot
-    // Nesse caso, o número do cliente está em payload.sender
+    // Mantém o JID completo para envio (incluindo @lid ou @s.whatsapp.net)
     const remoteJid = data?.key?.remoteJid || '';
-    const senderField = (payload?.sender || '').replace('@s.whatsapp.net', '');
-    const numeroConectado = process.env.NUMERO_CONECTADO || '';
+    const numero = remoteJid; // Usa o JID completo diretamente
 
-    let numero = remoteJid
-      .replace('@s.whatsapp.net', '')
-      .replace('@lid', '');
-
-    // Se remoteJid for o próprio número conectado, usa o sender
-    if (numero === numeroConectado || numero === senderField) {
-      // Tenta outros campos
-      const participant = (data?.key?.participant || '').replace('@s.whatsapp.net', '');
-      if (participant && participant.length >= 8) {
-        numero = participant;
-      } else {
-        console.log('[WhatsApp] Não foi possível identificar o remetente');
-        return null;
-      }
+    if (!numero || numero.length < 8) {
+      console.log('[WhatsApp] JID inválido:', remoteJid);
+      return null;
     }
 
     if (!numero || numero.length < 8) {
