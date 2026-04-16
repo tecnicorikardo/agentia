@@ -38,41 +38,48 @@ function extrairDadosWebhook(payload) {
     const data = payload?.data || payload;
     if (!data) return null;
 
-    console.log('[DEBUG] remoteJid:', data?.key?.remoteJid, '| fromMe:', data?.key?.fromMe, '| sender:', payload?.sender, '| participant:', data?.key?.participant);
+    // Log completo para debug
+    console.log('[DEBUG] event:', payload?.event,
+      '| remoteJid:', data?.key?.remoteJid,
+      '| fromMe:', data?.key?.fromMe,
+      '| sender:', payload?.sender,
+      '| participant:', data?.key?.participant,
+      '| tipo:', data?.messageType);
+
+    // Só processa evento de mensagem recebida
+    const evento = payload?.event || '';
+    if (evento && evento !== 'messages.upsert') return null;
 
     const tipo = data?.messageType;
     if (tipo !== 'conversation' && tipo !== 'extendedTextMessage') return null;
 
-    // Ignora mensagens enviadas pelo próprio bot
-    if (data?.key?.fromMe) return null;
+    // CRÍTICO: ignora mensagens enviadas pelo próprio bot
+    if (data?.key?.fromMe === true) {
+      console.log('[WhatsApp] Ignorando mensagem própria (fromMe=true)');
+      return null;
+    }
 
     const mensagem =
       data?.message?.conversation ||
       data?.message?.extendedTextMessage?.text;
     if (!mensagem) return null;
 
+    // remoteJid é sempre o número de quem mandou quando fromMe=false
     const remoteJid = data?.key?.remoteJid || '';
+    let numero = remoteJid
+      .replace('@s.whatsapp.net', '')
+      .replace('@lid', '');
 
-    let numero;
-
-    if (remoteJid.includes('@lid')) {
-      // Quando vem @lid, o número do cliente está em data.key.participant
-      // ou podemos usar o pushName não — precisamos do número
-      // Na Evolution API v1, o campo correto é data.key.participant
+    // Se vier @lid sem número válido, tenta o participant
+    if (!numero || numero.length < 8) {
       const participant = data?.key?.participant || '';
-      if (participant) {
-        numero = participant.replace('@s.whatsapp.net', '').replace('@lid', '');
-      } else {
-        // Fallback: tenta extrair de outros campos
-        // O remoteJid @lid não tem o número — ignora essa mensagem
-        console.log('[WhatsApp] @lid sem participant — ignorando');
-        return null;
-      }
-    } else {
-      numero = remoteJid.replace('@s.whatsapp.net', '');
+      numero = participant.replace('@s.whatsapp.net', '').replace('@lid', '');
     }
 
-    if (!numero || numero.length < 8) return null;
+    if (!numero || numero.length < 8) {
+      console.log('[WhatsApp] Número inválido:', remoteJid);
+      return null;
+    }
 
     console.log(`[WhatsApp] Mensagem de ${numero}: "${mensagem}"`);
     return { numero, mensagem };
