@@ -64,16 +64,27 @@ function extrairDadosWebhook(payload) {
       data?.message?.extendedTextMessage?.text;
     if (!mensagem) return null;
 
-    // remoteJid é sempre o número de quem mandou quando fromMe=false
+    // remoteJid quando fromMe=false é quem mandou a mensagem
+    // MAS na Evolution API v1, em alguns casos o remoteJid é o próprio bot
+    // Nesse caso, o número do cliente está em payload.sender
     const remoteJid = data?.key?.remoteJid || '';
+    const senderField = (payload?.sender || '').replace('@s.whatsapp.net', '');
+    const numeroConectado = process.env.NUMERO_CONECTADO || '';
+
     let numero = remoteJid
       .replace('@s.whatsapp.net', '')
       .replace('@lid', '');
 
-    // Se vier @lid sem número válido, tenta o participant
-    if (!numero || numero.length < 8) {
-      const participant = data?.key?.participant || '';
-      numero = participant.replace('@s.whatsapp.net', '').replace('@lid', '');
+    // Se remoteJid for o próprio número conectado, usa o sender
+    if (numero === numeroConectado || numero === senderField) {
+      // Tenta outros campos
+      const participant = (data?.key?.participant || '').replace('@s.whatsapp.net', '');
+      if (participant && participant.length >= 8) {
+        numero = participant;
+      } else {
+        console.log('[WhatsApp] Não foi possível identificar o remetente');
+        return null;
+      }
     }
 
     if (!numero || numero.length < 8) {
