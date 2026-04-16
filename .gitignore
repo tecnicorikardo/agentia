@@ -1,3 +1,9 @@
 node_modules/
 .env
 *.log
+*.json
+!package.json
+!package-lock.json
+!railway.json
+qrcode.png
+

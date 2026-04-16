@@ -5,61 +5,62 @@ const { obterContextoProdutos } = require('../services/produtoService');
 
 // Controle anti-spam: armazena timestamps das últimas mensagens por número
 const ultimaMensagem = new Map();
-const INTERVALO_MINIMO_MS = 3000; // 3 segundos entre mensagens do mesmo cliente
+const INTERVALO_MINIMO_MS = 2000; // Reduzido para 2 segundos para ser mais responsivo
 
 /**
  * Processa mensagem recebida via webhook do WhatsApp
  */
 async function receberMensagem(req, res) {
-  // Responde imediatamente ao webhook para evitar timeout
+  // Responde imediatamente ao webhook para evitar timeout na Evolution API
   res.status(200).json({ status: 'recebido' });
 
   try {
     const dados = extrairDadosWebhook(req.body);
-    if (!dados) return; // Ignora eventos irrelevantes
+    if (!dados) return; // Ignora se não houver dados úteis (ou se for do bot)
 
     const { numero, mensagem } = dados;
 
-    // Anti-spam: ignora se a última mensagem foi há menos de 3s
+    // Anti-spam: ignora se a última mensagem foi há menos de INTERVALO_MINIMO_MS
     const agora = Date.now();
     const ultima = ultimaMensagem.get(numero) || 0;
     if (agora - ultima < INTERVALO_MINIMO_MS) {
-      console.log(`[Webhook] Anti-spam ativado para ${numero}`);
+      console.log(`[Webhook] Anti-spam: ignorando mensagem de ${numero}`);
       return;
     }
     ultimaMensagem.set(numero, agora);
 
-    console.log(`[Webhook] Mensagem de ${numero}: "${mensagem}"`);
-
     // 1. Busca histórico do cliente
+    console.log(`[Webhook] Processando mensagem de ${numero}...`);
     const conversa = await buscarConversa(numero);
     const historico = conversa.historico || [];
 
-    // 2. Detecta intenção para ajustar estratégia
+    // 2. Detecta intenção
     const intencao = detectarIntencao(mensagem);
-    console.log(`[Webhook] Intenção detectada: ${intencao}`);
+    console.log(`[Webhook] Intenção para ${numero}: ${intencao}`);
 
-    // 3. Busca contexto de produtos
+    // 3. Busca contexto de produtos (catálogo)
     const contextoProdutos = await obterContextoProdutos();
 
     // 4. Adiciona mensagem atual ao histórico temporário
     const historicoAtual = [...historico, { role: 'user', content: mensagem }];
 
-    // 5. Gera resposta com IA
+    // 5. Gera resposta com Groq (Llama 3.3)
+    console.log(`[Webhook] Gerando resposta IA para ${numero}...`);
     const resposta = await gerarResposta(historicoAtual, contextoProdutos);
 
-    // 6. Determina novo status da conversa
+    // 6. Determina novo status
     const novoStatus = determinarStatus(intencao, conversa.status);
 
     // 7. Salva no Firebase
     await salvarMensagem(numero, mensagem, resposta, novoStatus);
+    console.log(`[Webhook] Histórico salvo para ${numero}`);
 
-    // 8. Envia resposta ao cliente (já inclui delay humano interno)
+    // 8. Envia resposta ao cliente
     await enviarMensagem(numero, resposta);
+    console.log(`[Webhook] Ciclo completo para ${numero}`);
 
-    console.log(`[Webhook] Resposta enviada para ${numero}`);
   } catch (error) {
-    console.error('[Webhook] Erro ao processar mensagem:', error.message);
+    console.error(`[Webhook] ERRO CRÍTICO no processamento:`, error.message);
   }
 }
 
@@ -74,3 +75,4 @@ function determinarStatus(intencao, statusAtual) {
 }
 
 module.exports = { receberMensagem };
+

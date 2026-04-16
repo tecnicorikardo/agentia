@@ -14,22 +14,32 @@ async function enviarMensagem(numero, mensagem) {
       return null;
     }
 
+    console.log(`[WhatsApp] Preparando envio para ${numero}...`);
     await delayHumano(tempoAleatorio());
 
     // Evolution API v2 usa campo "text" direto (não "textMessage")
+    const url = `${BASE_URL}/message/sendText/${INSTANCE}`;
+    
     const response = await axios.post(
-      `${BASE_URL}/message/sendText/${INSTANCE}`,
+      url,
       { number: numero, text: mensagem },
       {
         headers: { apikey: API_KEY, 'Content-Type': 'application/json' },
-        timeout: 10000,
+        timeout: 15000, // Aumentado para 15s para evitar timeout em redes lentas
       }
     );
 
-    console.log(`[WhatsApp] Mensagem enviada para ${numero}`);
+    console.log(`[WhatsApp] Sucesso ao enviar para ${numero}`);
     return response.data;
   } catch (error) {
-    console.error('[WhatsApp] Erro ao enviar mensagem:', error.response?.data || error.message);
+    const errorData = error.response?.data || error.message;
+    console.error(`[WhatsApp] ERRO no envio para ${numero}:`, JSON.stringify(errorData, null, 2));
+    
+    // Log extra se for erro de timeout
+    if (error.code === 'ECONNABORTED') {
+      console.error(`[WhatsApp] Timeout ao conectar com a API em: ${BASE_URL}`);
+    }
+    
     throw new Error('Falha ao enviar mensagem via WhatsApp');
   }
 }
@@ -37,35 +47,42 @@ async function enviarMensagem(numero, mensagem) {
 function extrairDadosWebhook(payload) {
   try {
     const data = payload?.data || payload;
-    if (!data) return null;
+    if (!data) {
+      console.log('[Webhook] Payload vazio ou inválido');
+      return null;
+    }
 
-    console.log('[DEBUG] event:', payload?.event,
-      '| remoteJid:', data?.key?.remoteJid,
-      '| fromMe:', data?.key?.fromMe,
-      '| tipo:', data?.messageType);
+    const evento = payload?.event || '';
+    const remoteJid = data?.key?.remoteJid || '';
+    const fromMe = data?.key?.fromMe === true;
+    const tipo = data?.messageType;
+
+    console.log(`[Webhook] Evento: ${evento} | JID: ${remoteJid} | FromMe: ${fromMe} | Tipo: ${tipo}`);
 
     // Só processa evento de mensagem recebida
-    const evento = payload?.event || '';
     if (evento && evento !== 'messages.upsert') return null;
 
-    const tipo = data?.messageType;
-    if (tipo !== 'conversation' && tipo !== 'extendedTextMessage') return null;
-
     // Ignora mensagens enviadas pelo próprio bot
-    if (data?.key?.fromMe === true) return null;
+    if (fromMe) return null;
+
+    if (tipo !== 'conversation' && tipo !== 'extendedTextMessage') {
+       console.log(`[Webhook] Tipo de mensagem ignorado: ${tipo}`);
+       return null;
+    }
 
     const mensagem =
       data?.message?.conversation ||
       data?.message?.extendedTextMessage?.text;
-    if (!mensagem) return null;
 
-    // Na v2, remoteJid é o número de quem mandou quando fromMe=false
-    const remoteJid = data?.key?.remoteJid || '';
+    if (!mensagem) {
+      console.log('[Webhook] Mensagem sem conteúdo de texto');
+      return null;
+    }
+
+    // O numero para resposta é o remoteJid completo
     const numero = remoteJid;
 
-    if (!numero || numero.length < 8) return null;
-
-    console.log(`[WhatsApp] Mensagem de ${numero}: "${mensagem}"`);
+    console.log(`[WhatsApp] Mensagem extraída de ${numero}: "${mensagem}"`);
     return { numero, mensagem };
   } catch (error) {
     console.error('[WhatsApp] Erro ao extrair dados do webhook:', error.message);
@@ -74,3 +91,4 @@ function extrairDadosWebhook(payload) {
 }
 
 module.exports = { enviarMensagem, extrairDadosWebhook };
+
