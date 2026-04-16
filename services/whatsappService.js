@@ -16,19 +16,17 @@ async function enviarMensagem(numero, mensagem) {
 
     await delayHumano(tempoAleatorio());
 
-    // Se for @lid, envia direto com o JID completo
-    const destino = numero.includes('@') ? numero : numero;
-
+    // Evolution API v2 usa campo "text" direto (não "textMessage")
     const response = await axios.post(
       `${BASE_URL}/message/sendText/${INSTANCE}`,
-      { number: destino, textMessage: { text: mensagem } },
+      { number: numero, text: mensagem },
       {
         headers: { apikey: API_KEY, 'Content-Type': 'application/json' },
         timeout: 10000,
       }
     );
 
-    console.log(`[WhatsApp] Mensagem enviada para ${destino}`);
+    console.log(`[WhatsApp] Mensagem enviada para ${numero}`);
     return response.data;
   } catch (error) {
     console.error('[WhatsApp] Erro ao enviar mensagem:', error.response?.data || error.message);
@@ -41,12 +39,9 @@ function extrairDadosWebhook(payload) {
     const data = payload?.data || payload;
     if (!data) return null;
 
-    // Log completo para debug
     console.log('[DEBUG] event:', payload?.event,
       '| remoteJid:', data?.key?.remoteJid,
       '| fromMe:', data?.key?.fromMe,
-      '| sender:', payload?.sender,
-      '| participant:', data?.key?.participant,
       '| tipo:', data?.messageType);
 
     // Só processa evento de mensagem recebida
@@ -56,30 +51,19 @@ function extrairDadosWebhook(payload) {
     const tipo = data?.messageType;
     if (tipo !== 'conversation' && tipo !== 'extendedTextMessage') return null;
 
-    // CRÍTICO: ignora mensagens enviadas pelo próprio bot
-    if (data?.key?.fromMe === true) {
-      console.log('[WhatsApp] Ignorando mensagem própria (fromMe=true)');
-      return null;
-    }
+    // Ignora mensagens enviadas pelo próprio bot
+    if (data?.key?.fromMe === true) return null;
 
     const mensagem =
       data?.message?.conversation ||
       data?.message?.extendedTextMessage?.text;
     if (!mensagem) return null;
 
-    // Mantém o JID completo para envio (incluindo @lid ou @s.whatsapp.net)
+    // Na v2, remoteJid é o número de quem mandou quando fromMe=false
     const remoteJid = data?.key?.remoteJid || '';
-    const numero = remoteJid; // Usa o JID completo diretamente
+    const numero = remoteJid;
 
-    if (!numero || numero.length < 8) {
-      console.log('[WhatsApp] JID inválido:', remoteJid);
-      return null;
-    }
-
-    if (!numero || numero.length < 8) {
-      console.log('[WhatsApp] Número inválido:', remoteJid);
-      return null;
-    }
+    if (!numero || numero.length < 8) return null;
 
     console.log(`[WhatsApp] Mensagem de ${numero}: "${mensagem}"`);
     return { numero, mensagem };
