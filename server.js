@@ -24,6 +24,11 @@ app.use((req, res, next) => {
 // Rotas
 app.use('/', routes);
 
+// Versão do deploy — útil para confirmar que o código novo está rodando
+app.get('/version', (req, res) => {
+  res.json({ version: '2.0.0', fix: 'JID-limpo+evento-case-insensitive', deployedAt: new Date().toISOString() });
+});
+
 // Endpoint de Debug — apenas em ambiente de desenvolvimento
 if (process.env.NODE_ENV !== 'production') {
   app.get('/debug-vars', (req, res) => {
