@@ -203,3 +203,91 @@ EVOLUTION_API_URL=http://evolution-api.railway.internal:8080
 4. **Resiliência:** Timeout de envio aumentado para 15s.
 
 **Status:** 🚀 Pronto para teste. Envie uma mensagem e acompanhe os logs prefixados com `[WhatsApp]` ou `[Webhook]`.
+
+---
+
+## [14] Limpeza geral e correções de segurança
+
+### Problemas corrigidos
+
+**1. Dependências não utilizadas removidas**
+- Removidos `openai` e `@google/generative-ai` do `package.json` (projeto usa apenas `groq-sdk`)
+- 11 pacotes removidos após `npm install`
+
+**Arquivo:** `package.json`
+
+---
+
+**2. Arquivos de debug/teste removidos da raiz**
+Os seguintes arquivos foram deletados (não fazem parte do sistema em produção):
+`diagnostico.js`, `final_attempt.js`, `fix_webhook.js`, `generate_qr.js`, `hard_reset.js`, `inspect_api.js`, `recreate_instance.js`, `test_create.js`, `test_send.js`, `test_webhook.js`, `create_and_pair.js`, `fetch_instances.js`, `get_pairing_code.js`, `save_qr.js`, `qrcode.json`, `qrcode_final.json`
+
+---
+
+**3. Endpoint `/debug-vars` protegido**
+- Antes: exposto publicamente em produção
+- Depois: disponível apenas quando `NODE_ENV !== 'production'`
+
+**Arquivo:** `server.js`
+
+---
+
+**4. README.md atualizado**
+- Corrigida referência à OpenAI (agora Groq / Llama 3.3 70B)
+- Removida referência à pasta `backend/` (foi consolidada na raiz)
+- Adicionadas instruções de deploy no Railway
+- Documentado comportamento do `/debug-vars` em produção
+
+**Arquivo:** `README.md`
+
+---
+
+**Nota sobre `.gitignore`**
+O `.gitignore` já estava correto: bloqueia `.env` e `*.json` (exceto `package.json`, `package-lock.json` e `railway.json`). O arquivo de credenciais Firebase (`agentai-5585e-firebase-adminsdk-fbsvc-9363b22edd.json`) está protegido pela regra `*.json`.
+
+---
+
+## [15] Fix crítico: agente não enviava nem respondia mensagens
+
+### Causa raiz (4 problemas combinados)
+
+---
+
+**1. Fix: Número com sufixo @s.whatsapp.net rejeitado pela Evolution API**
+
+- Antes: `numero = remoteJid` → ex: `5521986925971@s.whatsapp.net`
+- Depois: `numero = remoteJid.replace(/@.*$/, '')` → ex: `5521986925971`
+
+A Evolution API v2 espera número limpo no endpoint `/message/sendText`. O JID completo era rejeitado silenciosamente.
+
+**Arquivo:** `services/whatsappService.js`
+
+---
+
+**2. Fix: Evento MESSAGES_UPSERT ignorado (case-sensitive)**
+
+- Antes: `evento !== 'messages.upsert'` → rejeitava `MESSAGES_UPSERT` (maiúsculo)
+- Depois: `evento.toLowerCase() !== 'messages.upsert'` → aceita qualquer capitalização
+
+A Evolution API envia o evento como `MESSAGES_UPSERT` (maiúsculo), mas o código comparava com `messages.upsert` (minúsculo), descartando todas as mensagens silenciosamente.
+
+**Arquivo:** `services/whatsappService.js`
+
+---
+
+**3. Fix: .env.example atualizado para Groq**
+
+- Removida `OPENAI_API_KEY` (projeto migrou para Groq)
+- Adicionada `GROQ_API_KEY`
+- Adicionado comentário sobre URL interna do Railway
+
+**Arquivo:** `.env.example`
+
+---
+
+**Nota sobre Railway (problema 3 do relatório)**
+A variável `EVOLUTION_API_URL` no `.env` de produção deve usar a URL interna:
+```
+EVOLUTION_API_URL=http://evolution-api.railway.internal:8080
+```
+Isso precisa ser configurado manualmente no painel do Railway (não pode ser commitado no `.env`).

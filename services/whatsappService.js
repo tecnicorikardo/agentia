@@ -59,8 +59,8 @@ function extrairDadosWebhook(payload) {
 
     console.log(`[Webhook] Evento: ${evento} | JID: ${remoteJid} | FromMe: ${fromMe} | Tipo: ${tipo}`);
 
-    // Só processa evento de mensagem recebida
-    if (evento && evento !== 'messages.upsert') return null;
+    // Só processa evento de mensagem recebida (case-insensitive)
+    if (evento && evento.toLowerCase() !== 'messages.upsert') return null;
 
     // Ignora mensagens enviadas pelo próprio bot
     if (fromMe) return null;
@@ -79,8 +79,8 @@ function extrairDadosWebhook(payload) {
       return null;
     }
 
-    // O numero para resposta é o remoteJid completo
-    const numero = remoteJid;
+    // Limpa o JID para obter apenas o número (remove @s.whatsapp.net, @lid, etc.)
+    const numero = remoteJid.replace(/@.*$/, '');
 
     console.log(`[WhatsApp] Mensagem extraída de ${numero}: "${mensagem}"`);
     return { numero, mensagem };

@@ -24,17 +24,19 @@ app.use((req, res, next) => {
 // Rotas
 app.use('/', routes);
 
-// Endpoint de Debug para Railway
-app.get('/debug-vars', (req, res) => {
-  res.json({
-    status: 'online',
-    evolution_url: process.env.EVOLUTION_API_URL || 'não configurada',
-    instance: process.env.EVOLUTION_INSTANCE || 'não configurada',
-    has_groq_key: !!process.env.GROQ_API_KEY,
-    has_firebase_project: !!process.env.FIREBASE_PROJECT_ID,
-    timestamp: new Date().toISOString()
+// Endpoint de Debug — apenas em ambiente de desenvolvimento
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/debug-vars', (req, res) => {
+    res.json({
+      status: 'online',
+      evolution_url: process.env.EVOLUTION_API_URL || 'não configurada',
+      instance: process.env.EVOLUTION_INSTANCE || 'não configurada',
+      has_groq_key: !!process.env.GROQ_API_KEY,
+      has_firebase_project: !!process.env.FIREBASE_PROJECT_ID,
+      timestamp: new Date().toISOString()
+    });
   });
-});
+}
 
 // Tratamento de rotas não encontradas
 app.use((req, res) => {
