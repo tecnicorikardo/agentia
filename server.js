@@ -21,10 +21,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rotas
-app.use('/', routes);
-
-// Versão do deploy — útil para confirmar que o código novo está rodando
+// Versão do deploy
 app.get('/version', (req, res) => {
   res.json({ version: '2.0.0', fix: 'JID-limpo+evento-case-insensitive', deployedAt: new Date().toISOString() });
 });
@@ -42,6 +39,9 @@ if (process.env.NODE_ENV !== 'production') {
     });
   });
 }
+
+// Rotas
+app.use('/', routes);
 
 // Tratamento de rotas não encontradas
 app.use((req, res) => {
