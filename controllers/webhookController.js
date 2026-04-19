@@ -1,23 +1,35 @@
 const { extrairDadosWebhook, enviarMensagem } = require('../services/whatsappService');
 const { gerarResposta } = require('../services/openaiService');
 const { buscarConversa, salvarMensagem, detectarIntencao } = require('../services/conversationService');
-const { obterContextoProdutos, buscarFiado, buscarVendasCliente, listarProdutos, registrarVenda } = require('../services/gestaoService');
+const { buscarFiado, buscarVendasCliente, listarProdutos, registrarVenda } = require('../services/gestaoService');
 
 // Anti-spam
 const ultimaMensagem = new Map();
 const INTERVALO_MINIMO_MS = 2000;
 
 /**
- * Tenta extrair pedido confirmado da resposta da IA
- * Detecta padrões como "confirmo seu pedido de X" ou "pedido registrado"
+ * Normaliza texto: minúsculo, sem acentos, sem pontuação
+ */
+function normalizar(str) {
+  return (str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Detecta se a IA confirmou um pedido e quais produtos estão na resposta
  */
 function extrairPedidoConfirmado(respostaIA, produtos) {
-  const texto = respostaIA.toLowerCase();
+  const texto = normalizar(respostaIA);
 
-  // Só processa se a IA confirmou o pedido
-  const confirmou = /confirm|registr|anot|pedido feito|pedido recebido|vou separar|anotei|perfeito|ótimo|combinado/.test(texto);
+  // Verifica se a IA confirmou o pedido
+  const confirmou = /confirm|registr|anot|pedido feito|pedido recebido|vou separar|anotei|perfeito|otimo|combinado|certo|anotado/.test(texto);
   if (!confirmou) {
-    console.log(`[Webhook] IA não confirmou pedido. Resposta: "${respostaIA.substring(0, 80)}..."`);
+    console.log(`[Webhook] IA nao confirmou pedido. Resposta: "${respostaIA.substring(0, 80)}"`);
     return null;
   }
 
@@ -25,36 +37,44 @@ function extrairPedidoConfirmado(respostaIA, produtos) {
   const itensPedido = [];
 
   for (const produto of produtos) {
-    const nomeProd = (produto.name || produto.nome || '').toLowerCase();
+    const nomeProd = normalizar(produto.name || produto.nome || '');
     if (!nomeProd) continue;
 
-    // Verifica se o nome do produto aparece na resposta
-    if (texto.includes(nomeProd)) {
-      // Tenta extrair quantidade
-      const regexQtd = new RegExp(`(\\d+)\\s*(?:x\\s*)?${nomeProd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${nomeProd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(?:x\\s*)?(\\d+)`);
+    // Busca parcial: qualquer palavra significativa do nome do produto
+    const palavras = nomeProd.split(' ').filter(p => p.length > 2);
+    const encontrou = palavras.some(palavra => texto.includes(palavra));
+
+    if (encontrou) {
+      // Tenta extrair quantidade antes ou depois do nome
+      const primeiraP = palavras[0];
+      const regexQtd = new RegExp(`(\\d+)\\s*(?:x\\s*)?${primeiraP}|${primeiraP}\\s*(?:x\\s*)?(\\d+)`);
       const match = texto.match(regexQtd);
       const quantidade = match ? parseInt(match[1] || match[2]) || 1 : 1;
 
-      console.log(`[Webhook] Produto detectado: ${nomeProd} x${quantidade}`);
+      console.log(`[Webhook] Produto detectado: "${produto.name}" x${quantidade}`);
       itensPedido.push({
         produtoId: produto.id,
         nome: produto.name || produto.nome,
         quantidade,
-        precoUnitario: produto.salePrice ?? produto.price ?? produto.preco ?? 0,
       });
     }
   }
 
-  if (itensPedido.length === 0) return null;
+  if (itensPedido.length === 0) {
+    console.log(`[Webhook] Nenhum produto encontrado na resposta da IA`);
+    return null;
+  }
 
-  // Detecta método de pagamento na resposta da IA
+  // Detecta método de pagamento
   let paymentMethod = 'dinheiro';
   if (/pix/.test(texto)) paymentMethod = 'pix';
-  else if (/cart[aã]o|crédito|débito/.test(texto)) paymentMethod = 'cartao';
+  else if (/cartao|credito|debito/.test(texto)) paymentMethod = 'cartao';
   else if (/fiado/.test(texto)) paymentMethod = 'fiado';
 
   return { itens: itensPedido, paymentMethod };
-}/**
+}
+
+/**
  * Processa mensagem recebida via webhook do WhatsApp
  */
 async function receberMensagem(req, res) {
@@ -80,13 +100,12 @@ async function receberMensagem(req, res) {
     const historico = conversa.historico || [];
 
     const intencao = detectarIntencao(mensagem);
-    console.log(`[Webhook] Intenção para ${numero}: ${intencao}`);
+    console.log(`[Webhook] Intencao para ${numero}: ${intencao}`);
 
-    // Busca contexto em paralelo
-    const [produtos, fiadoInfo, vendasRecentes] = await Promise.all([
+    // Busca produtos e fiado em paralelo (vendas recentes ignoradas por falta de índice)
+    const [produtos, fiadoInfo] = await Promise.all([
       listarProdutos(),
       buscarFiado(numero),
-      buscarVendasCliente(numero),
     ]);
 
     const contextoProdutos = produtos.length
@@ -95,9 +114,6 @@ async function receberMensagem(req, res) {
 
     const contextoExtra = {
       fiado: fiadoInfo.saldo,
-      ultimoPedido: vendasRecentes[0]
-        ? `${vendasRecentes[0].items?.map(i => i.name || i.nome).join(', ')} — R$ ${Number(vendasRecentes[0].total).toFixed(2)}`
-        : null,
     };
 
     const historicoAtual = [...historico, { role: 'user', content: mensagem }];
@@ -105,8 +121,7 @@ async function receberMensagem(req, res) {
     console.log(`[Webhook] Gerando resposta IA para ${numero}...`);
     const resposta = await gerarResposta(historicoAtual, contextoProdutos, contextoExtra);
 
-    // Detecta se a IA confirmou um pedido na resposta e registra a venda
-    // Analisa a RESPOSTA DA IA (não a mensagem do cliente)
+    // Detecta pedido confirmado na RESPOSTA DA IA e registra venda
     const pedidoDetectado = extrairPedidoConfirmado(resposta, produtos);
     if (pedidoDetectado) {
       for (const item of pedidoDetectado.itens) {
@@ -120,20 +135,20 @@ async function receberMensagem(req, res) {
           });
           console.log(`[Webhook] Venda registrada: ${vendaId}`);
         } catch (e) {
-          console.error(`[Webhook] Erro ao registrar venda:`, e.message);
+          console.error(`[Webhook] Erro ao registrar venda: ${e.message}`);
         }
       }
     }
 
     const novoStatus = determinarStatus(intencao, conversa.status);
     await salvarMensagem(numero, mensagem, resposta, novoStatus);
-    console.log(`[Webhook] Histórico salvo para ${numero}`);
+    console.log(`[Webhook] Historico salvo para ${numero}`);
 
     await enviarMensagem(numero, resposta);
     console.log(`[Webhook] Ciclo completo para ${numero}`);
 
   } catch (error) {
-    console.error(`[Webhook] ERRO CRÍTICO no processamento:`, error.message);
+    console.error(`[Webhook] ERRO CRITICO no processamento: ${error.message}`);
   }
 }
 
