@@ -72,8 +72,7 @@ async function obterContextoProdutos() {
       const preco = p.salePrice ?? p.price ?? p.preco ?? 0;
       const nome = p.name ?? p.nome ?? 'Produto';
       const desc = p.description ?? p.descricao ?? '';
-      const estoque = p.stock != null ? ` | Estoque: ${p.stock} ${p.unit || 'un'}` : '';
-      return `- ${nome} | R$ ${Number(preco).toFixed(2)}${desc ? ` | ${desc}` : ''}${estoque}`;
+      return `- ${nome} | R$ ${Number(preco).toFixed(2)}${desc ? ` | ${desc}` : ''}`;
     })
     .join('\n');
 }
