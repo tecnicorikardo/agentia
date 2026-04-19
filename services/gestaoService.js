@@ -127,83 +127,124 @@ async function upsertCliente(numero, nome = '') {
 }
 
 // ─────────────────────────────────────────
-// VENDAS
+// VENDAS — transação atômica
 // ─────────────────────────────────────────
 
 /**
- * Registra uma venda no Bloquinho e dá baixa no estoque
- * @param {string} clienteNumero
- * @param {string} clienteNome
- * @param {Array}  itens  - [{produtoId, nome, quantidade, precoUnitario}]
- * @param {string} obs
- * @param {string} paymentMethod - 'dinheiro' | 'pix' | 'fiado' | 'cartao'
- * @returns {Promise<string>} ID da venda
+ * Registra venda com baixa de estoque e lançamento financeiro
+ * Tudo em uma transação Firestore atômica
+ *
+ * @param {Object} params
+ * @param {string} params.produtoId
+ * @param {number} params.quantidade
+ * @param {string} params.paymentMethod - 'dinheiro' | 'pix' | 'cartao' | 'fiado' | 'emprestimo'
+ * @param {string} params.clienteNome
+ * @param {string} params.clientePhone
+ * @param {string} [params.dueDate] - obrigatório se paymentMethod === 'emprestimo'
+ * @returns {Promise<string>} ID da venda criada
  */
-async function registrarVenda(clienteNumero, clienteNome = '', itens, obs = '', paymentMethod = 'dinheiro') {
-  try {
-    const total = itens.reduce((acc, i) => acc + i.quantidade * i.precoUnitario, 0);
+async function registrarVenda({ produtoId, quantidade, paymentMethod = 'dinheiro', clienteNome = '', clientePhone = '', dueDate = null }) {
+  const base = lojaRef();
 
-    // Cria ou busca cliente
-    let clienteId = null;
-    const clienteSnap = await lojaRef().collection('customers')
-      .where('phone', '==', clienteNumero).limit(1).get();
+  // 1. Buscar produto
+  const prodRef = base.collection('products').doc(produtoId);
+  const prodDoc = await prodRef.get();
+
+  if (!prodDoc.exists) throw new Error(`Produto ${produtoId} não encontrado`);
+
+  const produto = prodDoc.data();
+  if (produto.stock < quantidade) {
+    throw new Error(`Estoque insuficiente: ${produto.stock} disponível, ${quantidade} solicitado`);
+  }
+
+  const total = produto.salePrice * quantidade;
+  const nomeProduto = produto.name;
+  const dayKey = new Date().toISOString().split('T')[0]; // "2025-04-19"
+  const agora = new Date().toISOString();
+  const descricao = `Venda de ${nomeProduto}`;
+
+  // 2. Buscar ou criar cliente
+  let clienteNomeFinal = clienteNome || null;
+  if (clienteNome) {
+    const clienteSnap = await base.collection('customers')
+      .where('name', '==', clienteNome)
+      .where('isActive', '==', true)
+      .limit(1)
+      .get();
 
     if (clienteSnap.empty) {
-      const novoCliente = await lojaRef().collection('customers').add({
-        name: clienteNome || 'Cliente WhatsApp',
-        phone: clienteNumero,
-        origem: 'whatsapp',
-        createdAt: new Date().toISOString(),
+      await base.collection('customers').add({
+        name: clienteNome,
+        phone: clientePhone || '',
+        isActive: true,
+        createdAt: agora,
       });
-      clienteId = novoCliente.id;
-    } else {
-      clienteId = clienteSnap.docs[0].id;
+      console.log(`[Gestao] Cliente criado: ${clienteNome}`);
     }
-
-    // Monta itens no formato do Bloquinho
-    const saleItems = itens.map(i => ({
-      productId: i.produtoId || '',
-      name: i.nome,
-      quantity: i.quantidade,
-      unitPrice: i.precoUnitario,
-      total: i.quantidade * i.precoUnitario,
-    }));
-
-    // Cria a venda
-    const venda = {
-      customerId: clienteId,
-      customerName: clienteNome || 'Cliente WhatsApp',
-      customerPhone: clienteNumero,
-      items: saleItems,
-      total,
-      paymentMethod,
-      status: paymentMethod === 'fiado' ? 'fiado' : 'completed',
-      notes: obs,
-      origem: 'whatsapp',
-      createdAt: new Date().toISOString(),
-      userId: OWNER_UID,
-    };
-
-    const vendaRef = await lojaRef().collection('sales').add(venda);
-    console.log(`[Gestao] Venda criada: ${vendaRef.id} | R$ ${total.toFixed(2)}`);
-
-    // Dá baixa no estoque de cada item
-    for (const item of itens) {
-      if (!item.produtoId) continue;
-      const prodRef = lojaRef().collection('products').doc(item.produtoId);
-      const prod = await prodRef.get();
-      if (prod.exists && prod.data().stock != null) {
-        const novoEstoque = Math.max(0, prod.data().stock - item.quantidade);
-        await prodRef.update({ stock: novoEstoque });
-        console.log(`[Gestao] Estoque atualizado: ${item.nome} → ${novoEstoque}`);
-      }
-    }
-
-    return vendaRef.id;
-  } catch (error) {
-    console.error('[Gestao] Erro ao registrar venda:', error.message);
-    throw error;
   }
+
+  // 3. Transação atômica
+  const vendaRef = base.collection('sales').doc();
+  const entradaRef = base.collection('financial_entries').doc();
+  const dividaRef = base.collection('debts').doc();
+
+  await db.runTransaction(async (t) => {
+    // a) Baixa de estoque
+    t.update(prodRef, { stock: produto.stock - quantidade });
+
+    // b) Registro de venda
+    t.set(vendaRef, {
+      description: descricao,
+      total,
+      mode: 'product',
+      paymentMethod,
+      customerName: clienteNomeFinal,
+      productName: nomeProduto,
+      productId: produtoId,
+      quantity: quantidade,
+      dayKey,
+      createdAt: agora,
+    });
+
+    const ehFiadoOuEmprestimo = paymentMethod === 'fiado' || paymentMethod === 'emprestimo';
+
+    if (!ehFiadoOuEmprestimo) {
+      // c) Lançamento financeiro (receita)
+      t.set(entradaRef, {
+        type: 'revenue',
+        description: descricao,
+        category: 'Vendas',
+        amount: total,
+        origin: 'sale',
+        dayKey,
+        createdAt: agora,
+      });
+    } else if (paymentMethod === 'fiado') {
+      // d) Dívida (fiado)
+      t.set(dividaRef, {
+        customerName: clienteNomeFinal || 'Cliente nao informado',
+        description: `Fiado de venda: ${descricao}`,
+        category: 'Fiado',
+        originalAmount: total,
+        openAmount: total,
+        createdAt: agora,
+      });
+    } else if (paymentMethod === 'emprestimo') {
+      if (!dueDate) throw new Error('dueDate obrigatório para empréstimo');
+      t.set(dividaRef, {
+        customerName: clienteNomeFinal || 'Cliente nao informado',
+        description: `Empréstimo: ${descricao}`,
+        category: 'Emprestimo',
+        originalAmount: total,
+        openAmount: total,
+        dueDate,
+        createdAt: agora,
+      });
+    }
+  });
+
+  console.log(`[Gestao] Venda registrada: ${vendaRef.id} | ${nomeProduto} x${quantidade} | R$ ${total.toFixed(2)} | ${paymentMethod}`);
+  return vendaRef.id;
 }
 
 /**

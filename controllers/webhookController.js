@@ -45,10 +45,16 @@ function extrairPedidoConfirmado(respostaIA, produtos) {
     }
   }
 
-  return itensPedido.length > 0 ? itensPedido : null;
-}
+  if (itensPedido.length === 0) return null;
 
-/**
+  // Detecta método de pagamento na resposta da IA
+  let paymentMethod = 'dinheiro';
+  if (/pix/.test(texto)) paymentMethod = 'pix';
+  else if (/cart[aã]o|crédito|débito/.test(texto)) paymentMethod = 'cartao';
+  else if (/fiado/.test(texto)) paymentMethod = 'fiado';
+
+  return { itens: itensPedido, paymentMethod };
+}/**
  * Processa mensagem recebida via webhook do WhatsApp
  */
 async function receberMensagem(req, res) {
@@ -101,13 +107,21 @@ async function receberMensagem(req, res) {
 
     // Detecta se a IA confirmou um pedido na resposta e registra a venda
     // Analisa a RESPOSTA DA IA (não a mensagem do cliente)
-    const itensPedido = extrairPedidoConfirmado(resposta, produtos);
-    if (itensPedido) {
-      try {
-        const vendaId = await registrarVenda(numero, conversa.nomeCliente || '', itensPedido, 'via WhatsApp');
-        console.log(`[Webhook] Venda registrada: ${vendaId} | Estoque atualizado`);
-      } catch (e) {
-        console.error(`[Webhook] Erro ao registrar venda:`, e.message);
+    const pedidoDetectado = extrairPedidoConfirmado(resposta, produtos);
+    if (pedidoDetectado) {
+      for (const item of pedidoDetectado.itens) {
+        try {
+          const vendaId = await registrarVenda({
+            produtoId: item.produtoId,
+            quantidade: item.quantidade,
+            paymentMethod: pedidoDetectado.paymentMethod,
+            clienteNome: conversa.nomeCliente || '',
+            clientePhone: numero,
+          });
+          console.log(`[Webhook] Venda registrada: ${vendaId}`);
+        } catch (e) {
+          console.error(`[Webhook] Erro ao registrar venda:`, e.message);
+        }
       }
     }
 
