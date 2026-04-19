@@ -8,27 +8,34 @@ const ultimaMensagem = new Map();
 const INTERVALO_MINIMO_MS = 2000;
 
 /**
- * Tenta extrair pedido confirmado da resposta da IA + histórico
+ * Tenta extrair pedido confirmado da resposta da IA
  * Detecta padrões como "confirmo seu pedido de X" ou "pedido registrado"
  */
 function extrairPedidoConfirmado(respostaIA, produtos) {
   const texto = respostaIA.toLowerCase();
 
   // Só processa se a IA confirmou o pedido
-  const confirmou = /confirm|registr|anot|pedido feito|pedido recebido|vou separar/.test(texto);
-  if (!confirmou) return null;
+  const confirmou = /confirm|registr|anot|pedido feito|pedido recebido|vou separar|anotei|perfeito|ótimo|combinado/.test(texto);
+  if (!confirmou) {
+    console.log(`[Webhook] IA não confirmou pedido. Resposta: "${respostaIA.substring(0, 80)}..."`);
+    return null;
+  }
 
+  console.log(`[Webhook] IA confirmou pedido. Buscando produtos na resposta...`);
   const itensPedido = [];
 
   for (const produto of produtos) {
     const nomeProd = (produto.name || produto.nome || '').toLowerCase();
-    // Busca o nome do produto na resposta da IA
-    if (texto.includes(nomeProd)) {
-      // Tenta extrair quantidade (ex: "2 açaí", "1 parmegiana")
-      const regexQtd = new RegExp(`(\\d+)\\s*${nomeProd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${nomeProd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(\\d+)`);
-      const match = texto.match(regexQtd);
-      const quantidade = match ? parseInt(match[1] || match[2]) : 1;
+    if (!nomeProd) continue;
 
+    // Verifica se o nome do produto aparece na resposta
+    if (texto.includes(nomeProd)) {
+      // Tenta extrair quantidade
+      const regexQtd = new RegExp(`(\\d+)\\s*(?:x\\s*)?${nomeProd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${nomeProd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(?:x\\s*)?(\\d+)`);
+      const match = texto.match(regexQtd);
+      const quantidade = match ? parseInt(match[1] || match[2]) || 1 : 1;
+
+      console.log(`[Webhook] Produto detectado: ${nomeProd} x${quantidade}`);
       itensPedido.push({
         produtoId: produto.id,
         nome: produto.name || produto.nome,
@@ -92,16 +99,15 @@ async function receberMensagem(req, res) {
     console.log(`[Webhook] Gerando resposta IA para ${numero}...`);
     const resposta = await gerarResposta(historicoAtual, contextoProdutos, contextoExtra);
 
-    // Detecta se a IA confirmou um pedido e registra a venda
-    if (intencao === 'pedido' || conversa.status === 'negociando') {
-      const itensPedido = extrairPedidoConfirmado(resposta, produtos);
-      if (itensPedido) {
-        try {
-          const vendaId = await registrarVenda(numero, conversa.nomeCliente || '', itensPedido, 'via WhatsApp');
-          console.log(`[Webhook] Venda registrada: ${vendaId} | Estoque atualizado`);
-        } catch (e) {
-          console.error(`[Webhook] Erro ao registrar venda:`, e.message);
-        }
+    // Detecta se a IA confirmou um pedido na resposta e registra a venda
+    // Analisa a RESPOSTA DA IA (não a mensagem do cliente)
+    const itensPedido = extrairPedidoConfirmado(resposta, produtos);
+    if (itensPedido) {
+      try {
+        const vendaId = await registrarVenda(numero, conversa.nomeCliente || '', itensPedido, 'via WhatsApp');
+        console.log(`[Webhook] Venda registrada: ${vendaId} | Estoque atualizado`);
+      } catch (e) {
+        console.error(`[Webhook] Erro ao registrar venda:`, e.message);
       }
     }
 
