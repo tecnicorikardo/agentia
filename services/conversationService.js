@@ -1,11 +1,31 @@
+/**
+ * conversationService.js
+ *
+ * Gerencia histórico de conversas do agente.
+ * Armazenado em: users/{ownerUid}/agent_conversations/{clienteNumero}
+ *
+ * Fica junto com os dados da loja no bloquinhodigital,
+ * permitindo que o agente acesse produtos, vendas e conversas
+ * na mesma conexão Firebase.
+ */
+
 const { db } = require('../config/firebase');
 
-const COLECAO = 'conversas';
+const OWNER_UID = process.env.BLOQUINHO_OWNER_UID;
 const MAX_HISTORICO = 20;
 
+// Referência base das conversas
+const conversasRef = () =>
+  db.collection('users').doc(OWNER_UID).collection('agent_conversations');
+
+/**
+ * Busca ou cria conversa de um cliente
+ * @param {string} clienteId - Número do WhatsApp
+ * @returns {Promise<Object>}
+ */
 async function buscarConversa(clienteId) {
   try {
-    const docRef = db.collection(COLECAO).doc(clienteId);
+    const docRef = conversasRef().doc(clienteId);
     const doc = await docRef.get();
 
     if (!doc.exists) {
@@ -27,9 +47,16 @@ async function buscarConversa(clienteId) {
   }
 }
 
+/**
+ * Salva mensagem e resposta no histórico
+ * @param {string} clienteId
+ * @param {string} mensagemCliente
+ * @param {string} respostaIA
+ * @param {string} status
+ */
 async function salvarMensagem(clienteId, mensagemCliente, respostaIA, status = 'interessado') {
   try {
-    const docRef = db.collection(COLECAO).doc(clienteId);
+    const docRef = conversasRef().doc(clienteId);
     const doc = await docRef.get();
     const dados = doc.exists ? doc.data() : { historico: [] };
 
@@ -37,11 +64,9 @@ async function salvarMensagem(clienteId, mensagemCliente, respostaIA, status = '
     historico.push({ role: 'user', content: mensagemCliente });
     historico.push({ role: 'assistant', content: respostaIA });
 
-    const historicoLimitado = historico.slice(-MAX_HISTORICO);
-
     await docRef.set(
       {
-        historico: historicoLimitado,
+        historico: historico.slice(-MAX_HISTORICO),
         status,
         atualizadoEm: new Date().toISOString(),
       },
@@ -53,33 +78,39 @@ async function salvarMensagem(clienteId, mensagemCliente, respostaIA, status = '
   }
 }
 
+/**
+ * Lista todas as conversas (painel admin)
+ * @returns {Promise<Array>}
+ */
 async function listarConversas() {
   try {
-    // SEM orderBy — evita exigência de índice composto no Firestore
-    // Ordenação feita em memória após a busca
-    const snapshot = await db.collection(COLECAO).limit(100).get();
+    const snapshot = await conversasRef().limit(100).get();
 
-    const conversas = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      historico: undefined,
-      totalMensagens: (doc.data().historico || []).length,
-    }));
-
-    return conversas.sort((a, b) =>
-      (b.atualizadoEm || '').localeCompare(a.atualizadoEm || '')
-    );
+    return snapshot.docs
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        historico: undefined,
+        totalMensagens: (doc.data().historico || []).length,
+      }))
+      .sort((a, b) => (b.atualizadoEm || '').localeCompare(a.atualizadoEm || ''));
   } catch (error) {
     console.error('[Conversa] Erro ao listar conversas:', error.message);
     throw error;
   }
 }
 
+/**
+ * Detecta intenção da mensagem do cliente
+ * @param {string} mensagem
+ * @returns {string}
+ */
 function detectarIntencao(mensagem) {
   const texto = mensagem.toLowerCase();
   if (/quanto custa|pre[cç]o|valor|promo[cç][aã]o|desconto/.test(texto)) return 'preco';
   if (/quero|gostei|me interessa|comprar|pedir/.test(texto)) return 'pedido';
   if (/tem|existe|dispon[ií]vel|op[cç][oõ]es|cat[aá]logo/.test(texto)) return 'interesse';
+  if (/fiado|devo|d[ií]vida|quanto devo/.test(texto)) return 'fiado';
   return 'geral';
 }
 
