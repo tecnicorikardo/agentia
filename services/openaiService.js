@@ -1,21 +1,14 @@
-const Groq = require('groq-sdk');
+/**
+ * openaiService.js
+ *
+ * Mantido com este nome por compatibilidade, mas agora delega
+ * para aiProvider.js — troque o provedor de IA lá, não aqui.
+ */
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const { gerarResposta: _gerarResposta } = require('./aiProvider');
 
 const SYSTEM_PROMPT = `Você é a Helô, atendente animada e simpática de uma marmitaria e sorveteria gourmet! 🍱🍦
 Seu objetivo é atender os clientes com energia, tirar dúvidas e fechar pedidos.
-
-Cardápio:
-🍱 Marmitas:
-- Parmegiana: R$ 24,90
-- Filé de frango empanado: R$ 21,90
-- Macarrão penne com cheddar: R$ 23,90
-
-🍧 Gelados:
-- Açaí 300ml: R$ 11,00
-- Sacolé gourmet (Nutella ou Chocolate): R$ 8,00
-
-🛵 Taxa de entrega: R$ 2,00
 
 Diretrizes:
 - Responda SEMPRE em português brasileiro
@@ -23,39 +16,34 @@ Diretrizes:
 - Respostas curtas e objetivas (máximo 3 linhas)
 - Pergunte o nome do cliente no primeiro contato
 - Quando o cliente escolher, confirme o pedido e o endereço de entrega
-- Sugira combos: ex "Que tal um sacolé de sobremesa por só R$ 8? 😋"
+- Sugira combos quando fizer sentido
 - Nunca invente produtos ou preços fora do cardápio
-- Se perguntarem algo fora do cardápio, diga gentilmente que não temos no momento`;
+- Se perguntarem algo fora do cardápio, diga gentilmente que não temos no momento
+- Se o cliente perguntar sobre fiado, informe o saldo atual se disponível`;
 
 /**
- * Gera resposta usando Groq (Llama 3.3 70B) — gratuito e ultra-rápido
- * @param {Array} historico - Array de mensagens [{role, content}]
- * @param {string} contextoLoja - Produtos disponíveis
+ * Gera resposta da IA com contexto da loja
+ * @param {Array}  historico       - Histórico de mensagens
+ * @param {string} contextoProdutos - Produtos formatados como texto
+ * @param {Object} contextoExtra   - Dados adicionais (fiado, pedidos, etc)
  * @returns {Promise<string>}
  */
-async function gerarResposta(historico, contextoLoja = '') {
-  try {
-    const systemContent = contextoLoja
-      ? `${SYSTEM_PROMPT}\n\nProdutos disponíveis:\n${contextoLoja}`
-      : SYSTEM_PROMPT;
+async function gerarResposta(historico, contextoProdutos = '', contextoExtra = {}) {
+  let systemContent = SYSTEM_PROMPT;
 
-    const messages = [
-      { role: 'system', content: systemContent },
-      ...historico,
-    ];
-
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages,
-      max_tokens: 300,
-      temperature: 0.8,
-    });
-
-    return completion.choices[0].message.content.trim();
-  } catch (error) {
-    console.error('[Groq] Erro ao gerar resposta:', error.message);
-    throw new Error('Falha ao processar resposta da IA');
+  if (contextoProdutos) {
+    systemContent += `\n\nCardápio atual:\n${contextoProdutos}`;
   }
+
+  if (contextoExtra.fiado > 0) {
+    systemContent += `\n\nFiado do cliente: R$ ${contextoExtra.fiado.toFixed(2)} em aberto.`;
+  }
+
+  if (contextoExtra.ultimoPedido) {
+    systemContent += `\n\nÚltimo pedido do cliente: ${contextoExtra.ultimoPedido}`;
+  }
+
+  return _gerarResposta(systemContent, historico);
 }
 
 module.exports = { gerarResposta };

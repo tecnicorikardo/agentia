@@ -291,3 +291,25 @@ A variável `EVOLUTION_API_URL` no `.env` de produção deve usar a URL interna:
 EVOLUTION_API_URL=http://evolution-api.railway.internal:8080
 ```
 Isso precisa ser configurado manualmente no painel do Railway (não pode ser commitado no `.env`).
+
+---
+
+## [16] Fix crítico: Evolution API travava no sendText (Redis)
+
+### Causa raiz
+A Evolution API v2 tentava conectar ao Redis a cada 500ms e falhava (`redis disconnected`). Isso bloqueava completamente o endpoint `/message/sendText` porque ele aguardava o cache Redis antes de enviar.
+
+### Correção
+Desabilitado Redis e ativado cache local no serviço `evolution-api` no Railway:
+```
+CACHE_REDIS_ENABLED=false
+CACHE_LOCAL_ENABLED=true
+```
+
+### Outras correções aplicadas nesta sessão
+- `EVOLUTION_API_KEY` no Railway estava com valor antigo (`87FAD08B3593...`) — corrigido para `agentia-evolution-key-2024`
+- Watch Path do serviço `agentia` no Railway estava configurado como `/backend` (pasta removida) — corrigido para raiz
+- Deploy via `railway up` forçado após Railway não puxar automaticamente do GitHub
+
+### Status
+✅ Agente respondendo mensagens normalmente

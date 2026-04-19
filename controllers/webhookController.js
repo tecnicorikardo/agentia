@@ -1,7 +1,7 @@
 const { extrairDadosWebhook, enviarMensagem } = require('../services/whatsappService');
 const { gerarResposta } = require('../services/openaiService');
 const { buscarConversa, salvarMensagem, detectarIntencao } = require('../services/conversationService');
-const { obterContextoProdutos } = require('../services/produtoService');
+const { obterContextoProdutos, buscarFiado, buscarPedidosCliente } = require('../services/gestaoService');
 
 // Controle anti-spam: armazena timestamps das últimas mensagens por número
 const ultimaMensagem = new Map();
@@ -38,24 +38,36 @@ async function receberMensagem(req, res) {
     const intencao = detectarIntencao(mensagem);
     console.log(`[Webhook] Intenção para ${numero}: ${intencao}`);
 
-    // 3. Busca contexto de produtos (catálogo)
-    const contextoProdutos = await obterContextoProdutos();
+    // 3. Busca contexto de produtos e dados do cliente em paralelo
+    const [contextoProdutos, fiadoInfo, pedidosRecentes] = await Promise.all([
+      obterContextoProdutos(),
+      buscarFiado(numero),
+      buscarPedidosCliente(numero),
+    ]);
 
-    // 4. Adiciona mensagem atual ao histórico temporário
+    // 4. Monta contexto extra para a IA
+    const contextoExtra = {
+      fiado: fiadoInfo.saldo,
+      ultimoPedido: pedidosRecentes[0]
+        ? `${pedidosRecentes[0].itens?.map(i => i.nome).join(', ')} — R$ ${pedidosRecentes[0].total?.toFixed(2)}`
+        : null,
+    };
+
+    // 5. Adiciona mensagem atual ao histórico temporário
     const historicoAtual = [...historico, { role: 'user', content: mensagem }];
 
-    // 5. Gera resposta com Groq (Llama 3.3)
+    // 6. Gera resposta com IA
     console.log(`[Webhook] Gerando resposta IA para ${numero}...`);
-    const resposta = await gerarResposta(historicoAtual, contextoProdutos);
+    const resposta = await gerarResposta(historicoAtual, contextoProdutos, contextoExtra);
 
-    // 6. Determina novo status
+    // 7. Determina novo status
     const novoStatus = determinarStatus(intencao, conversa.status);
 
-    // 7. Salva no Firebase
+    // 8. Salva no Firebase
     await salvarMensagem(numero, mensagem, resposta, novoStatus);
     console.log(`[Webhook] Histórico salvo para ${numero}`);
 
-    // 8. Envia resposta ao cliente
+    // 9. Envia resposta ao cliente
     await enviarMensagem(numero, resposta);
     console.log(`[Webhook] Ciclo completo para ${numero}`);
 
