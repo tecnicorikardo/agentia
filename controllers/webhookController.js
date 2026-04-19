@@ -1,7 +1,7 @@
 const { extrairDadosWebhook, enviarMensagem } = require('../services/whatsappService');
 const { gerarResposta } = require('../services/openaiService');
 const { buscarConversa, salvarMensagem, detectarIntencao } = require('../services/conversationService');
-const { obterContextoProdutos, buscarFiado, buscarPedidosCliente } = require('../services/gestaoService');
+const { obterContextoProdutos, buscarFiado, buscarVendasCliente } = require('../services/gestaoService');
 
 // Controle anti-spam: armazena timestamps das últimas mensagens por número
 const ultimaMensagem = new Map();
@@ -39,17 +39,17 @@ async function receberMensagem(req, res) {
     console.log(`[Webhook] Intenção para ${numero}: ${intencao}`);
 
     // 3. Busca contexto de produtos e dados do cliente em paralelo
-    const [contextoProdutos, fiadoInfo, pedidosRecentes] = await Promise.all([
+    const [contextoProdutos, fiadoInfo, vendasRecentes] = await Promise.all([
       obterContextoProdutos(),
       buscarFiado(numero),
-      buscarPedidosCliente(numero),
+      buscarVendasCliente(numero),
     ]);
 
     // 4. Monta contexto extra para a IA
     const contextoExtra = {
       fiado: fiadoInfo.saldo,
-      ultimoPedido: pedidosRecentes[0]
-        ? `${pedidosRecentes[0].itens?.map(i => i.nome).join(', ')} — R$ ${pedidosRecentes[0].total?.toFixed(2)}`
+      ultimoPedido: vendasRecentes[0]
+        ? `${vendasRecentes[0].items?.map(i => i.nome).join(', ')} — R$ ${vendasRecentes[0].total?.toFixed(2)}`
         : null,
     };
 

@@ -1,18 +1,40 @@
 /**
  * gestaoService.js — Integração com Bloquinho Digital
  *
- * Consulta produtos, pedidos, fiados e dados da loja
- * via Firestore direto (mesmo SDK já configurado no projeto).
- *
  * Estrutura Firestore:
- *   stores/{storeId}/products/{productId}
- *   orders/{orderId}
- *   stores/{storeId}
+ *   users/{uid}/products/{id}
+ *   users/{uid}/customers/{id}
+ *   users/{uid}/sales/{id}
+ *   users/{uid}/settings/store_profile
+ *
+ * O ID da loja = UID do Firebase Auth do dono.
+ * Configurado via BLOQUINHO_OWNER_UID no .env
  */
 
 const { db } = require('../config/firebase');
 
-const STORE_ID = process.env.BLOQUINHO_STORE_ID;
+const OWNER_UID = process.env.BLOQUINHO_OWNER_UID;
+
+// Referência base — tudo parte daqui
+const lojaRef = () => db.collection('users').doc(OWNER_UID);
+
+// ─────────────────────────────────────────
+// LOJA
+// ─────────────────────────────────────────
+
+/**
+ * Busca perfil da loja
+ * @returns {Promise<Object>}
+ */
+async function buscarInfoLoja() {
+  try {
+    const doc = await lojaRef().collection('settings').doc('store_profile').get();
+    return doc.exists ? doc.data() : {};
+  } catch (error) {
+    console.error('[Gestao] Erro ao buscar loja:', error.message);
+    return {};
+  }
+}
 
 // ─────────────────────────────────────────
 // PRODUTOS
@@ -24,10 +46,9 @@ const STORE_ID = process.env.BLOQUINHO_STORE_ID;
  */
 async function listarProdutos() {
   try {
-    const snapshot = await db
+    const snapshot = await lojaRef()
       .collection('products')
-      .where('storeId', '==', STORE_ID)
-      .where('ativo', '==', true)
+      .where('isActive', '==', true)
       .get();
 
     return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
@@ -46,63 +67,115 @@ async function obterContextoProdutos() {
   if (!produtos.length) return '';
 
   return produtos
-    .map((p) => `- ${p.nome} | R$ ${Number(p.preco).toFixed(2)}${p.descricao ? ` | ${p.descricao}` : ''}`)
+    .map((p) => {
+      const preco = p.price ?? p.preco ?? 0;
+      const nome = p.name ?? p.nome ?? 'Produto';
+      const desc = p.description ?? p.descricao ?? '';
+      return `- ${nome} | R$ ${Number(preco).toFixed(2)}${desc ? ` | ${desc}` : ''}`;
+    })
     .join('\n');
 }
 
 // ─────────────────────────────────────────
-// PEDIDOS
+// CLIENTES
 // ─────────────────────────────────────────
 
 /**
- * Cria um novo pedido na loja
- * @param {string} clienteNumero - Número do WhatsApp do cliente
- * @param {Array}  itens         - [{produtoId, nome, quantidade, precoUnitario}]
- * @param {string} observacao    - Observação opcional
- * @returns {Promise<string>} ID do pedido criado
+ * Busca cliente pelo número de WhatsApp
+ * @param {string} numero
+ * @returns {Promise<Object|null>}
  */
-async function criarPedido(clienteNumero, itens, observacao = '') {
+async function buscarCliente(numero) {
+  try {
+    const snapshot = await lojaRef()
+      .collection('customers')
+      .where('phone', '==', numero)
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) return null;
+    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+  } catch (error) {
+    console.error('[Gestao] Erro ao buscar cliente:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Cria ou atualiza cliente
+ * @param {string} numero
+ * @param {string} nome
+ * @returns {Promise<string>} ID do cliente
+ */
+async function upsertCliente(numero, nome = '') {
+  try {
+    const cliente = await buscarCliente(numero);
+    if (cliente) return cliente.id;
+
+    const docRef = await lojaRef().collection('customers').add({
+      phone: numero,
+      name: nome,
+      origem: 'whatsapp',
+      criadoEm: new Date().toISOString(),
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('[Gestao] Erro ao upsert cliente:', error.message);
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────
+// VENDAS
+// ─────────────────────────────────────────
+
+/**
+ * Registra uma venda
+ * @param {string} clienteNumero
+ * @param {Array}  itens  - [{nome, quantidade, precoUnitario}]
+ * @param {string} obs
+ * @returns {Promise<string>} ID da venda
+ */
+async function registrarVenda(clienteNumero, itens, obs = '') {
   try {
     const total = itens.reduce((acc, i) => acc + i.quantidade * i.precoUnitario, 0);
 
-    const pedido = {
-      storeId: STORE_ID,
-      clienteNumero,
-      itens,
+    const venda = {
+      clientePhone: clienteNumero,
+      items: itens,
       total,
-      observacao,
+      obs,
       status: 'pendente',
       origem: 'whatsapp',
-      criadoEm: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
     };
 
-    const docRef = await db.collection('orders').add(pedido);
-    console.log(`[Gestao] Pedido criado: ${docRef.id} | Total: R$ ${total.toFixed(2)}`);
+    const docRef = await lojaRef().collection('sales').add(venda);
+    console.log(`[Gestao] Venda registrada: ${docRef.id} | R$ ${total.toFixed(2)}`);
     return docRef.id;
   } catch (error) {
-    console.error('[Gestao] Erro ao criar pedido:', error.message);
+    console.error('[Gestao] Erro ao registrar venda:', error.message);
     throw error;
   }
 }
 
 /**
- * Busca pedidos recentes de um cliente
+ * Busca vendas recentes de um cliente
  * @param {string} clienteNumero
  * @returns {Promise<Array>}
  */
-async function buscarPedidosCliente(clienteNumero) {
+async function buscarVendasCliente(clienteNumero) {
   try {
-    const snapshot = await db
-      .collection('orders')
-      .where('storeId', '==', STORE_ID)
-      .where('clienteNumero', '==', clienteNumero)
-      .orderBy('criadoEm', 'desc')
+    const snapshot = await lojaRef()
+      .collection('sales')
+      .where('clientePhone', '==', clienteNumero)
+      .orderBy('createdAt', 'desc')
       .limit(5)
       .get();
 
     return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
-    console.error('[Gestao] Erro ao buscar pedidos:', error.message);
+    console.error('[Gestao] Erro ao buscar vendas:', error.message);
     return [];
   }
 }
@@ -112,21 +185,21 @@ async function buscarPedidosCliente(clienteNumero) {
 // ─────────────────────────────────────────
 
 /**
- * Busca o saldo de fiado de um cliente
+ * Busca saldo de fiado de um cliente
  * @param {string} clienteNumero
  * @returns {Promise<{saldo: number, registros: Array}>}
  */
 async function buscarFiado(clienteNumero) {
   try {
-    const snapshot = await db
-      .collection('fiados')
-      .where('storeId', '==', STORE_ID)
-      .where('clienteNumero', '==', clienteNumero)
-      .where('status', '==', 'aberto')
+    // Fiado = vendas com status 'fiado' ou campo fiado=true
+    const snapshot = await lojaRef()
+      .collection('sales')
+      .where('clientePhone', '==', clienteNumero)
+      .where('status', '==', 'fiado')
       .get();
 
     const registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    const saldo = registros.reduce((acc, r) => acc + (r.valor || 0), 0);
+    const saldo = registros.reduce((acc, r) => acc + (r.total || 0), 0);
 
     return { saldo, registros };
   } catch (error) {
@@ -135,55 +208,13 @@ async function buscarFiado(clienteNumero) {
   }
 }
 
-/**
- * Registra um novo fiado para o cliente
- * @param {string} clienteNumero
- * @param {number} valor
- * @param {string} descricao
- * @returns {Promise<string>} ID do registro
- */
-async function registrarFiado(clienteNumero, valor, descricao) {
-  try {
-    const docRef = await db.collection('fiados').add({
-      storeId: STORE_ID,
-      clienteNumero,
-      valor,
-      descricao,
-      status: 'aberto',
-      criadoEm: new Date().toISOString(),
-    });
-    console.log(`[Gestao] Fiado registrado: ${docRef.id} | R$ ${valor}`);
-    return docRef.id;
-  } catch (error) {
-    console.error('[Gestao] Erro ao registrar fiado:', error.message);
-    throw error;
-  }
-}
-
-// ─────────────────────────────────────────
-// LOJA
-// ─────────────────────────────────────────
-
-/**
- * Busca informações da loja
- * @returns {Promise<Object>}
- */
-async function buscarInfoLoja() {
-  try {
-    const doc = await db.collection('stores').doc(STORE_ID).get();
-    return doc.exists ? doc.data() : {};
-  } catch (error) {
-    console.error('[Gestao] Erro ao buscar loja:', error.message);
-    return {};
-  }
-}
-
 module.exports = {
+  buscarInfoLoja,
   listarProdutos,
   obterContextoProdutos,
-  criarPedido,
-  buscarPedidosCliente,
+  buscarCliente,
+  upsertCliente,
+  registrarVenda,
+  buscarVendasCliente,
   buscarFiado,
-  registrarFiado,
-  buscarInfoLoja,
 };
