@@ -1,26 +1,59 @@
 const { extrairDadosWebhook, enviarMensagem } = require('../services/whatsappService');
 const { gerarResposta } = require('../services/openaiService');
 const { buscarConversa, salvarMensagem, detectarIntencao } = require('../services/conversationService');
-const { obterContextoProdutos, buscarFiado, buscarVendasCliente } = require('../services/gestaoService');
+const { obterContextoProdutos, buscarFiado, buscarVendasCliente, listarProdutos, registrarVenda } = require('../services/gestaoService');
 
-// Controle anti-spam: armazena timestamps das últimas mensagens por número
+// Anti-spam
 const ultimaMensagem = new Map();
-const INTERVALO_MINIMO_MS = 2000; // Reduzido para 2 segundos para ser mais responsivo
+const INTERVALO_MINIMO_MS = 2000;
+
+/**
+ * Tenta extrair pedido confirmado da resposta da IA + histórico
+ * Detecta padrões como "confirmo seu pedido de X" ou "pedido registrado"
+ */
+function extrairPedidoConfirmado(respostaIA, produtos) {
+  const texto = respostaIA.toLowerCase();
+
+  // Só processa se a IA confirmou o pedido
+  const confirmou = /confirm|registr|anot|pedido feito|pedido recebido|vou separar/.test(texto);
+  if (!confirmou) return null;
+
+  const itensPedido = [];
+
+  for (const produto of produtos) {
+    const nomeProd = (produto.name || produto.nome || '').toLowerCase();
+    // Busca o nome do produto na resposta da IA
+    if (texto.includes(nomeProd)) {
+      // Tenta extrair quantidade (ex: "2 açaí", "1 parmegiana")
+      const regexQtd = new RegExp(`(\\d+)\\s*${nomeProd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${nomeProd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(\\d+)`);
+      const match = texto.match(regexQtd);
+      const quantidade = match ? parseInt(match[1] || match[2]) : 1;
+
+      itensPedido.push({
+        produtoId: produto.id,
+        nome: produto.name || produto.nome,
+        quantidade,
+        precoUnitario: produto.salePrice ?? produto.price ?? produto.preco ?? 0,
+      });
+    }
+  }
+
+  return itensPedido.length > 0 ? itensPedido : null;
+}
 
 /**
  * Processa mensagem recebida via webhook do WhatsApp
  */
 async function receberMensagem(req, res) {
-  // Responde imediatamente ao webhook para evitar timeout na Evolution API
   res.status(200).json({ status: 'recebido' });
 
   try {
     const dados = extrairDadosWebhook(req.body);
-    if (!dados) return; // Ignora se não houver dados úteis (ou se for do bot)
+    if (!dados) return;
 
     const { numero, mensagem } = dados;
 
-    // Anti-spam: ignora se a última mensagem foi há menos de INTERVALO_MINIMO_MS
+    // Anti-spam
     const agora = Date.now();
     const ultima = ultimaMensagem.get(numero) || 0;
     if (agora - ultima < INTERVALO_MINIMO_MS) {
@@ -29,45 +62,53 @@ async function receberMensagem(req, res) {
     }
     ultimaMensagem.set(numero, agora);
 
-    // 1. Busca histórico do cliente
     console.log(`[Webhook] Processando mensagem de ${numero}...`);
     const conversa = await buscarConversa(numero);
     const historico = conversa.historico || [];
 
-    // 2. Detecta intenção
     const intencao = detectarIntencao(mensagem);
     console.log(`[Webhook] Intenção para ${numero}: ${intencao}`);
 
-    // 3. Busca contexto de produtos e dados do cliente em paralelo
-    const [contextoProdutos, fiadoInfo, vendasRecentes] = await Promise.all([
-      obterContextoProdutos(),
+    // Busca contexto em paralelo
+    const [produtos, fiadoInfo, vendasRecentes] = await Promise.all([
+      listarProdutos(),
       buscarFiado(numero),
       buscarVendasCliente(numero),
     ]);
 
-    // 4. Monta contexto extra para a IA
+    const contextoProdutos = produtos.length
+      ? produtos.map(p => `- ${p.name ?? p.nome} | R$ ${Number(p.salePrice ?? p.price ?? 0).toFixed(2)}${p.description ? ` | ${p.description}` : ''}`).join('\n')
+      : '';
+
     const contextoExtra = {
       fiado: fiadoInfo.saldo,
       ultimoPedido: vendasRecentes[0]
-        ? `${vendasRecentes[0].items?.map(i => i.nome).join(', ')} — R$ ${vendasRecentes[0].total?.toFixed(2)}`
+        ? `${vendasRecentes[0].items?.map(i => i.name || i.nome).join(', ')} — R$ ${Number(vendasRecentes[0].total).toFixed(2)}`
         : null,
     };
 
-    // 5. Adiciona mensagem atual ao histórico temporário
     const historicoAtual = [...historico, { role: 'user', content: mensagem }];
 
-    // 6. Gera resposta com IA
     console.log(`[Webhook] Gerando resposta IA para ${numero}...`);
     const resposta = await gerarResposta(historicoAtual, contextoProdutos, contextoExtra);
 
-    // 7. Determina novo status
-    const novoStatus = determinarStatus(intencao, conversa.status);
+    // Detecta se a IA confirmou um pedido e registra a venda
+    if (intencao === 'pedido' || conversa.status === 'negociando') {
+      const itensPedido = extrairPedidoConfirmado(resposta, produtos);
+      if (itensPedido) {
+        try {
+          const vendaId = await registrarVenda(numero, conversa.nomeCliente || '', itensPedido, 'via WhatsApp');
+          console.log(`[Webhook] Venda registrada: ${vendaId} | Estoque atualizado`);
+        } catch (e) {
+          console.error(`[Webhook] Erro ao registrar venda:`, e.message);
+        }
+      }
+    }
 
-    // 8. Salva no Firebase
+    const novoStatus = determinarStatus(intencao, conversa.status);
     await salvarMensagem(numero, mensagem, resposta, novoStatus);
     console.log(`[Webhook] Histórico salvo para ${numero}`);
 
-    // 9. Envia resposta ao cliente
     await enviarMensagem(numero, resposta);
     console.log(`[Webhook] Ciclo completo para ${numero}`);
 
@@ -76,9 +117,6 @@ async function receberMensagem(req, res) {
   }
 }
 
-/**
- * Determina o status da conversa com base na intenção e status atual
- */
 function determinarStatus(intencao, statusAtual) {
   if (statusAtual === 'fechado') return 'fechado';
   if (intencao === 'pedido') return 'negociando';
@@ -87,4 +125,3 @@ function determinarStatus(intencao, statusAtual) {
 }
 
 module.exports = { receberMensagem };
-

@@ -131,29 +131,75 @@ async function upsertCliente(numero, nome = '') {
 // ─────────────────────────────────────────
 
 /**
- * Registra uma venda
+ * Registra uma venda no Bloquinho e dá baixa no estoque
  * @param {string} clienteNumero
- * @param {Array}  itens  - [{nome, quantidade, precoUnitario}]
+ * @param {string} clienteNome
+ * @param {Array}  itens  - [{produtoId, nome, quantidade, precoUnitario}]
  * @param {string} obs
+ * @param {string} paymentMethod - 'dinheiro' | 'pix' | 'fiado' | 'cartao'
  * @returns {Promise<string>} ID da venda
  */
-async function registrarVenda(clienteNumero, itens, obs = '') {
+async function registrarVenda(clienteNumero, clienteNome = '', itens, obs = '', paymentMethod = 'dinheiro') {
   try {
     const total = itens.reduce((acc, i) => acc + i.quantidade * i.precoUnitario, 0);
 
+    // Cria ou busca cliente
+    let clienteId = null;
+    const clienteSnap = await lojaRef().collection('customers')
+      .where('phone', '==', clienteNumero).limit(1).get();
+
+    if (clienteSnap.empty) {
+      const novoCliente = await lojaRef().collection('customers').add({
+        name: clienteNome || 'Cliente WhatsApp',
+        phone: clienteNumero,
+        origem: 'whatsapp',
+        createdAt: new Date().toISOString(),
+      });
+      clienteId = novoCliente.id;
+    } else {
+      clienteId = clienteSnap.docs[0].id;
+    }
+
+    // Monta itens no formato do Bloquinho
+    const saleItems = itens.map(i => ({
+      productId: i.produtoId || '',
+      name: i.nome,
+      quantity: i.quantidade,
+      unitPrice: i.precoUnitario,
+      total: i.quantidade * i.precoUnitario,
+    }));
+
+    // Cria a venda
     const venda = {
-      clientePhone: clienteNumero,
-      items: itens,
+      customerId: clienteId,
+      customerName: clienteNome || 'Cliente WhatsApp',
+      customerPhone: clienteNumero,
+      items: saleItems,
       total,
-      obs,
-      status: 'pendente',
+      paymentMethod,
+      status: paymentMethod === 'fiado' ? 'fiado' : 'completed',
+      notes: obs,
       origem: 'whatsapp',
       createdAt: new Date().toISOString(),
+      userId: OWNER_UID,
     };
 
-    const docRef = await lojaRef().collection('sales').add(venda);
-    console.log(`[Gestao] Venda registrada: ${docRef.id} | R$ ${total.toFixed(2)}`);
-    return docRef.id;
+    const vendaRef = await lojaRef().collection('sales').add(venda);
+    console.log(`[Gestao] Venda criada: ${vendaRef.id} | R$ ${total.toFixed(2)}`);
+
+    // Dá baixa no estoque de cada item
+    for (const item of itens) {
+      if (!item.produtoId) continue;
+      const prodRef = lojaRef().collection('products').doc(item.produtoId);
+      const prod = await prodRef.get();
+      if (prod.exists && prod.data().stock != null) {
+        const novoEstoque = Math.max(0, prod.data().stock - item.quantidade);
+        await prodRef.update({ stock: novoEstoque });
+        console.log(`[Gestao] Estoque atualizado: ${item.nome} → ${novoEstoque}`);
+      }
+    }
+
+    return vendaRef.id;
   } catch (error) {
     console.error('[Gestao] Erro ao registrar venda:', error.message);
     throw error;
