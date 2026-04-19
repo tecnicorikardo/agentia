@@ -46,9 +46,10 @@ async function buscarInfoLoja() {
  */
 async function listarProdutos() {
   try {
+    // Bloquinho usa showInWeb=true para produtos visíveis
     const snapshot = await lojaRef()
       .collection('products')
-      .where('isActive', '==', true)
+      .where('showInWeb', '==', true)
       .get();
 
     return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
@@ -68,10 +69,11 @@ async function obterContextoProdutos() {
 
   return produtos
     .map((p) => {
-      const preco = p.price ?? p.preco ?? 0;
+      const preco = p.salePrice ?? p.price ?? p.preco ?? 0;
       const nome = p.name ?? p.nome ?? 'Produto';
       const desc = p.description ?? p.descricao ?? '';
-      return `- ${nome} | R$ ${Number(preco).toFixed(2)}${desc ? ` | ${desc}` : ''}`;
+      const estoque = p.stock != null ? ` | Estoque: ${p.stock} ${p.unit || 'un'}` : '';
+      return `- ${nome} | R$ ${Number(preco).toFixed(2)}${desc ? ` | ${desc}` : ''}${estoque}`;
     })
     .join('\n');
 }
