@@ -43,6 +43,10 @@ if (process.env.NODE_ENV !== 'production') {
 // Rotas
 app.use('/', routes);
 
+// Inicia scheduler de estudo
+const { iniciarScheduler } = require('./services/schedulerService');
+iniciarScheduler();
+
 // Tratamento de rotas não encontradas
 app.use((req, res) => {
   res.status(404).json({ erro: 'Rota não encontrada' });

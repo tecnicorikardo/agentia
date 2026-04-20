@@ -1,6 +1,9 @@
 const { extrairDadosWebhook, enviarMensagem } = require('../services/whatsappService');
 const { gerarResposta } = require('../services/openaiService');
 const { buscarConversa, salvarMensagem, detectarIntencao } = require('../services/conversationService');
+const { avaliarResposta } = require('../services/studyService');
+
+const NUMERO_RICARDO = process.env.STUDY_NUMERO || '5521986925971';
 
 // Anti-spam
 const ultimaMensagem = new Map();
@@ -33,7 +36,14 @@ async function receberMensagem(req, res) {
     const historicoAtual = [...historico, { role: 'user', content: mensagem }];
 
     console.log(`[Webhook] Gerando resposta IA para ${numero}...`);
-    const resposta = await gerarResposta(historicoAtual);
+
+    // Modo estudo: se for o número do Ricardo, IA avalia respostas de estudo
+    let resposta;
+    if (numero === NUMERO_RICARDO && conversa.status === 'estudando') {
+      resposta = await avaliarResposta(historicoAtual);
+    } else {
+      resposta = await gerarResposta(historicoAtual);
+    }
 
     const novoStatus = determinarStatus(intencao, conversa.status);
     await salvarMensagem(numero, mensagem, resposta, novoStatus);
