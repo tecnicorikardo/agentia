@@ -94,4 +94,4 @@ Quando Ricardo responder uma pergunta:
   return _gerarResposta(systemPrompt, historico);
 }
 
-module.exports = { montarMensagemManha, montarMensagemNoite, avaliarResposta, getTopicoDoDia };
+module.exports = { montarMensagemManha, montarMensagemNoite, avaliarResposta, getTopicoDoDia, TOPICOS };

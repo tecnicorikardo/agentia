@@ -1,69 +1,88 @@
 /**
  * schedulerService.js
- * Agenda envios diários de conteúdo de estudo
- * Segunda a Sábado: manhã (07:00) e noite (21:00) — horário de Brasília
+ * Envia um resumo de tópico a cada 1 hora, em ordem crescente.
+ * Quando termina o último tópico, volta para o primeiro.
+ * O índice atual é salvo no Firebase para sobreviver a restarts.
  */
 
 const { enviarMensagem } = require('./whatsappService');
-const { montarMensagemManha, montarMensagemNoite } = require('./studyService');
+const { TOPICOS } = require('./studyService');
+const { db } = require('../config/firebase');
 
 const NUMERO_RICARDO = process.env.STUDY_NUMERO || '5521986925971';
+const OWNER_UID = process.env.BLOQUINHO_OWNER_UID || 'avQGpnMx29ZO7NtdRjvUHLEGhAL2';
 
-// Horários em UTC (Brasília = UTC-3)
-// 07:00 BRT = 10:00 UTC
-// 21:00 BRT = 00:00 UTC (meia-noite)
-const HORA_MANHA_UTC = 10;
-const HORA_NOITE_UTC = 0;
+// Referência do estado do scheduler no Firebase
+const estadoRef = () => db.collection('users').doc(OWNER_UID)
+  .collection('agent_context').doc('study_scheduler');
+
+/**
+ * Busca o índice atual do tópico no Firebase
+ */
+async function getIndiceAtual() {
+  try {
+    const doc = await estadoRef().get();
+    if (!doc.exists) return 0;
+    return doc.data().indiceAtual || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Salva o próximo índice no Firebase
+ */
+async function salvarProximoIndice(indice) {
+  await estadoRef().set({
+    indiceAtual: indice,
+    ultimoEnvio: new Date().toISOString(),
+  }, { merge: true });
+}
+
+/**
+ * Monta a mensagem de resumo do tópico
+ */
+function montarResumo(topico, indice) {
+  return `📚 *Tópico ${indice + 1}/${TOPICOS.length}: ${topico.titulo}*\n\n${topico.resumo}\n\n_Próximo tópico em 1 hora_ ⏰`;
+}
 
 let schedulerAtivo = false;
 
 /**
- * Verifica se hoje é dia útil de estudo (seg-sáb)
- */
-function isDiaEstudo() {
-  const dia = new Date().getUTCDay(); // 0=dom, 1=seg, ..., 6=sáb
-  return dia >= 1 && dia <= 6; // segunda a sábado
-}
-
-/**
- * Verifica se é hora de enviar (manhã ou noite)
- * Retorna 'manha', 'noite' ou null
- */
-function getTipoEnvio() {
-  const hora = new Date().getUTCHours();
-  const minuto = new Date().getUTCMinutes();
-
-  if (hora === HORA_MANHA_UTC && minuto === 0) return 'manha';
-  if (hora === HORA_NOITE_UTC && minuto === 0) return 'noite';
-  return null;
-}
-
-/**
- * Inicia o scheduler — verifica a cada minuto
+ * Inicia o scheduler — envia um tópico a cada 1 hora
  */
 function iniciarScheduler() {
   if (schedulerAtivo) return;
   schedulerAtivo = true;
 
-  console.log('[Scheduler] Iniciado — envios seg-sáb às 07:00 e 21:00 (Brasília)');
+  console.log('[Scheduler] Iniciado — 1 tópico por hora, ordem crescente, reinicia no fim');
 
-  setInterval(async () => {
-    if (!isDiaEstudo()) return;
+  // Envia imediatamente ao iniciar (para não esperar 1h no primeiro boot)
+  enviarProximoTopico();
 
-    const tipo = getTipoEnvio();
-    if (!tipo) return;
+  // Depois envia a cada 1 hora
+  setInterval(enviarProximoTopico, 60 * 60 * 1000);
+}
 
-    try {
-      const mensagem = tipo === 'manha'
-        ? montarMensagemManha()
-        : montarMensagemNoite();
+async function enviarProximoTopico() {
+  try {
+    const indice = await getIndiceAtual();
+    const topico = TOPICOS[indice];
 
-      await enviarMensagem(NUMERO_RICARDO, mensagem);
-      console.log(`[Scheduler] Mensagem de ${tipo} enviada para ${NUMERO_RICARDO}`);
-    } catch (error) {
-      console.error(`[Scheduler] Erro ao enviar mensagem de ${tipo}:`, error.message);
+    const mensagem = montarResumo(topico, indice);
+    await enviarMensagem(NUMERO_RICARDO, mensagem);
+    console.log(`[Scheduler] Tópico ${indice + 1}/${TOPICOS.length} enviado: ${topico.titulo}`);
+
+    // Avança para o próximo (volta ao 0 quando chegar no fim)
+    const proximoIndice = (indice + 1) % TOPICOS.length;
+    await salvarProximoIndice(proximoIndice);
+
+    if (proximoIndice === 0) {
+      console.log('[Scheduler] Ciclo completo! Voltando ao primeiro tópico.');
     }
-  }, 60 * 1000); // verifica a cada 1 minuto
+  } catch (error) {
+    console.error('[Scheduler] Erro ao enviar tópico:', error.message);
+  }
 }
 
 module.exports = { iniciarScheduler };
