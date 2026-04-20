@@ -122,21 +122,29 @@ async function receberMensagem(req, res) {
     const resposta = await gerarResposta(historicoAtual, contextoProdutos, contextoExtra);
 
     // Detecta pedido confirmado na RESPOSTA DA IA e registra venda
-    const pedidoDetectado = extrairPedidoConfirmado(resposta, produtos);
-    if (pedidoDetectado) {
-      for (const item of pedidoDetectado.itens) {
-        try {
-          const vendaId = await registrarVenda({
-            produtoId: item.produtoId,
-            quantidade: item.quantidade,
-            paymentMethod: pedidoDetectado.paymentMethod,
-            clienteNome: conversa.nomeCliente || '',
-            clientePhone: numero,
-          });
-          console.log(`[Webhook] Venda registrada: ${vendaId}`);
-        } catch (e) {
-          console.error(`[Webhook] Erro ao registrar venda: ${e.message}`);
+    // Só registra se a conversa ainda não foi marcada como 'vendido'
+    if (conversa.status !== 'vendido') {
+      const pedidoDetectado = extrairPedidoConfirmado(resposta, produtos);
+      if (pedidoDetectado) {
+        for (const item of pedidoDetectado.itens) {
+          try {
+            const vendaId = await registrarVenda({
+              produtoId: item.produtoId,
+              quantidade: item.quantidade,
+              paymentMethod: pedidoDetectado.paymentMethod,
+              clienteNome: conversa.nomeCliente || '',
+              clientePhone: numero,
+            });
+            console.log(`[Webhook] Venda registrada: ${vendaId}`);
+          } catch (e) {
+            console.error(`[Webhook] Erro ao registrar venda: ${e.message}`);
+          }
         }
+        // Marca conversa como vendido para não duplicar
+        await salvarMensagem(numero, mensagem, resposta, 'vendido');
+        await enviarMensagem(numero, resposta);
+        console.log(`[Webhook] Ciclo completo para ${numero}`);
+        return;
       }
     }
 
@@ -154,6 +162,8 @@ async function receberMensagem(req, res) {
 
 function determinarStatus(intencao, statusAtual) {
   if (statusAtual === 'fechado') return 'fechado';
+  // Após venda concluída, nova mensagem reinicia o ciclo
+  if (statusAtual === 'vendido') return 'novo';
   if (intencao === 'pedido') return 'negociando';
   if (intencao === 'preco' || intencao === 'interesse') return 'interessado';
   return statusAtual || 'novo';
