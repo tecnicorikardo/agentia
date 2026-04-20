@@ -2,8 +2,24 @@ const { extrairDadosWebhook, enviarMensagem } = require('../services/whatsappSer
 const { gerarResposta } = require('../services/openaiService');
 const { buscarConversa, salvarMensagem, detectarIntencao } = require('../services/conversationService');
 const { avaliarResposta } = require('../services/studyService');
+const { db } = require('../config/firebase');
 
 const NUMERO_RICARDO = process.env.STUDY_NUMERO || '5521986925971';
+const OWNER_UID = process.env.BLOQUINHO_OWNER_UID || 'avQGpnMx29ZO7NtdRjvUHLEGhAL2';
+
+async function getIndiceEstudo() {
+  try {
+    const doc = await db.collection('users').doc(OWNER_UID)
+      .collection('agent_context').doc('study_scheduler').get();
+    if (!doc.exists) return 0;
+    // O índice salvo é o PRÓXIMO a enviar, então o atual é o anterior
+    const proximo = doc.data().indiceAtual || 0;
+    const { TOPICOS } = require('../services/studyService');
+    return (proximo - 1 + TOPICOS.length) % TOPICOS.length;
+  } catch {
+    return 0;
+  }
+}
 
 // Anti-spam
 const ultimaMensagem = new Map();
@@ -40,7 +56,8 @@ async function receberMensagem(req, res) {
     // Modo estudo: se for o número do Ricardo, IA avalia respostas de estudo
     let resposta;
     if (numero === NUMERO_RICARDO && conversa.status === 'estudando') {
-      resposta = await avaliarResposta(historicoAtual);
+      const indice = await getIndiceEstudo();
+      resposta = await avaliarResposta(historicoAtual, indice);
     } else {
       resposta = await gerarResposta(historicoAtual);
     }
