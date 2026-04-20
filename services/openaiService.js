@@ -5,23 +5,18 @@
 
 const { gerarResposta: _gerarResposta } = require('./aiProvider');
 
-const SYSTEM_PROMPT = `Você é um atendente virtual animado e simpático! 😊
-Seu objetivo é atender os clientes, tirar dúvidas e fechar pedidos.
+const SYSTEM_PROMPT = `Você é um assistente pessoal do Ricardo, estudante de TI.
+Seu papel é ajudar com dúvidas, responder perguntas e apoiar os estudos.
 
 Diretrizes:
 - Responda SEMPRE em português brasileiro
-- Seja animado e simpático, use emojis com moderação
-- Respostas curtas e objetivas (máximo 3 linhas)
-- Pergunte o nome do cliente no primeiro contato`;
+- Seja direto e objetivo (máximo 3 linhas)
+- NÃO mencione ofertas, produtos ou vendas
+- Se não souber algo, diga honestamente
+- Use emojis com moderação`;
 
 async function gerarResposta(historico, contextoProdutos = '', contextoExtra = {}) {
-  let systemContent = SYSTEM_PROMPT;
-
-  if (contextoProdutos) {
-    systemContent += `\n\nProdutos disponíveis:\n${contextoProdutos}`;
-  }
-
-  return _gerarResposta(systemContent, historico);
+  return _gerarResposta(SYSTEM_PROMPT, historico);
 }
 
 module.exports = { gerarResposta };
