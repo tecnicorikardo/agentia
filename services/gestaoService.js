@@ -13,10 +13,11 @@
 
 const { db } = require('../config/firebase');
 
-const OWNER_UID = process.env.BLOQUINHO_OWNER_UID;
+// Lido em tempo de execução para garantir que dotenv já carregou
+const getOwnerUid = () => process.env.BLOQUINHO_OWNER_UID;
 
 // Referência base — tudo parte daqui
-const lojaRef = () => db.collection('users').doc(OWNER_UID);
+const lojaRef = () => db.collection('users').doc(getOwnerUid());
 
 // ─────────────────────────────────────────
 // LOJA
