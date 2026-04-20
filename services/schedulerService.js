@@ -6,7 +6,7 @@
  */
 
 const { enviarMensagem } = require('./whatsappService');
-const { TOPICOS } = require('./studyService');
+const { TOPICOS, getTopicoPorIndice } = require('./studyService');
 const { db } = require('../config/firebase');
 
 const NUMERO_RICARDO = process.env.STUDY_NUMERO || '5521986925971';
@@ -67,7 +67,7 @@ function iniciarScheduler() {
 async function enviarProximoTopico() {
   try {
     const indice = await getIndiceAtual();
-    const topico = TOPICOS[indice];
+    const topico = getTopicoPorIndice(indice);
 
     const mensagem = montarResumo(topico, indice);
     await enviarMensagem(NUMERO_RICARDO, mensagem);
