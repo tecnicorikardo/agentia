@@ -1,501 +1,258 @@
 /**
  * studyService.js
- * Sistema de estudo com repetição espaçada, perguntas de fixação e flashcards
+ * Agente de Estudo Inteligente — Suporte TI
+ * 19 tópicos com 4 tipos de mensagem por dia
  */
 
 const { gerarResposta: _gerarResposta } = require('./aiProvider');
 
 const TOPICOS = [
   {
-    titulo: '💻 Fundamentos e Manutenção de Hardware',
-    modulo: 'Módulo I',
-    resumo: `O computador é regido pela arquitetura de Von Neumann, que introduziu o conceito de programa armazenado — instruções e dados coexistem na mesma memória.
-
-🔄 *Ciclo de instrução:* Busca (fetch) → Decodificação → Execução
-A CPU busca a instrução na memória, a Unidade de Controle interpreta, e a ULA executa.
-
-🧠 *Hierarquia de memória:*
-• Cache L1/L2/L3 → nanosegundos, reduz o Gargalo de Von Neumann
-• RAM → memória principal, volátil
-• SSD/HD → armazenamento persistente
-
-🔧 *Manutenção:*
-• Preventiva: limpeza e controle térmico
-• Corretiva: diagnóstico e substituição de componentes`,
-    pergunta: '❓ O que é o "Gargalo de Von Neumann" e como a memória cache resolve esse problema?',
-    flashcards: [
-      { p: 'O que faz a ULA?', r: 'Unidade Lógica e Aritmética — executa operações matemáticas e lógicas da CPU.' },
-      { p: 'Qual a diferença entre RAM e Cache?', r: 'Cache é mais rápida e fica dentro/próxima da CPU. RAM é maior e mais lenta.' },
-      { p: 'O que é manutenção preventiva?', r: 'Limpeza, controle térmico e verificações periódicas para evitar falhas.' },
+    num: '01', titulo: 'Fundamentos e Manutenção de Hardware',
+    conceitos: ['Arquitetura Von Neumann: programa armazenado, ciclo Busca→Decodifica→Executa', 'Hierarquia de memória: Cache L1/L2/L3 → RAM → SSD/HD', 'Manutenção preventiva (limpeza/térmica) vs corretiva (diagnóstico/troca)'],
+    revisao: ['O que é o ciclo de instrução da CPU?', 'Por que a memória cache existe?', 'Qual a diferença entre manutenção preventiva e corretiva?'],
+    teste: [
+      { p: 'O que é a arquitetura de Von Neumann?', a: ['A) Modelo onde CPU e memória são separados fisicamente', 'B) Modelo onde instruções e dados coexistem na mesma memória ✅', 'C) Tipo de processador de alta performance'] },
+      { p: 'Qual memória é mais rápida?', a: ['A) HD', 'B) RAM', 'C) Cache L1 ✅'] },
     ],
   },
   {
-    titulo: '🖥️ Introdução à Informática',
-    modulo: 'Módulo I',
-    resumo: `A alfabetização digital envolve entender como dados se transformam em informação útil.
-
-📊 *Ciclo de processamento:*
-Entrada → Processamento → Saída
-Base de qualquer dispositivo, do microprocessador ao supercomputador.
-
-⚖️ *Hardware vs Software:*
-• Hardware: parte física (CPU, teclado, monitor)
-• Software: parte lógica (SO, aplicativos)
-
-🖥️ *Tipos de computadores:*
-Desktops, notebooks, servidores, embarcados — cada um para uma necessidade diferente de custo, tamanho e desempenho.`,
-    pergunta: '❓ Qual a diferença entre hardware e software? Dê um exemplo de cada.',
-    flashcards: [
-      { p: 'Quais são as 3 etapas do ciclo de processamento?', r: 'Entrada → Processamento → Saída.' },
-      { p: 'O que é hardware?', r: 'Parte física do computador: CPU, memória, teclado, monitor.' },
-      { p: 'O que é software?', r: 'Parte lógica: sistema operacional, aplicativos, drivers.' },
+    num: '02', titulo: 'Introdução à Informática',
+    conceitos: ['Ciclo de processamento: Entrada → Processamento → Saída', 'Hardware (físico) vs Software (lógico)', 'Tipos de computadores: desktop, notebook, servidor, embarcado'],
+    revisao: ['Quais são as 3 etapas do ciclo de processamento?', 'Dê 2 exemplos de hardware e 2 de software.', 'Qual tipo de computador é usado em servidores web?'],
+    teste: [
+      { p: 'O ciclo de processamento é:', a: ['A) Ligar → Usar → Desligar', 'B) Entrada → Processamento → Saída ✅', 'C) Hardware → Software → Dados'] },
+      { p: 'Um teclado é exemplo de:', a: ['A) Software', 'B) Hardware de entrada ✅', 'C) Sistema operacional'] },
     ],
   },
   {
-    titulo: '🧠 Lógica Matemática',
-    modulo: 'Módulo I',
-    resumo: `A lógica matemática é o alicerce do raciocínio computacional.
-
-🔣 *Operadores lógicos:*
-• AND: verdadeiro só se AMBOS forem verdadeiros
-• OR: verdadeiro se PELO MENOS UM for verdadeiro
-• NOT: inverte o valor lógico
-
-📋 *Tabelas-verdade:* validam expressões booleanas e algoritmos de decisão.
-
-⚡ *Complexidade Big O:*
-• O(1) → constante, ideal
-• O(n) → linear
-• O(n²) → quadrático, lento
-• O(2ⁿ) → exponencial, proibitivo`,
-    pergunta: '❓ Se A=verdadeiro e B=falso, qual o resultado de: A AND B? A OR B? NOT A?',
-    flashcards: [
-      { p: 'O que significa O(1) em Big O?', r: 'Complexidade constante — o tempo não muda independente do tamanho dos dados.' },
-      { p: 'AND retorna verdadeiro quando?', r: 'Somente quando AMBOS os operandos são verdadeiros.' },
-      { p: 'Para que serve uma tabela-verdade?', r: 'Validar todas as combinações possíveis de uma expressão lógica.' },
+    num: '03', titulo: 'Lógica Matemática',
+    conceitos: ['Operadores: AND (ambos verdadeiros), OR (um verdadeiro), NOT (inverte)', 'Tabelas-verdade validam expressões booleanas', 'Big O: O(1) ideal, O(n) linear, O(n²) lento, O(2ⁿ) proibitivo'],
+    revisao: ['Se A=V e B=F, qual o resultado de A AND B?', 'O que mede a notação Big O?', 'Quando um algoritmo O(2ⁿ) se torna problemático?'],
+    teste: [
+      { p: 'AND retorna verdadeiro quando:', a: ['A) Pelo menos um operando é verdadeiro', 'B) Ambos os operandos são verdadeiros ✅', 'C) Nenhum operando é verdadeiro'] },
+      { p: 'Qual complexidade é a mais eficiente?', a: ['A) O(n²)', 'B) O(n)', 'C) O(1) ✅'] },
     ],
   },
   {
-    titulo: '🌐 Redes de Computadores',
-    modulo: 'Módulo I',
-    resumo: `Redes permitem que dispositivos se comuniquem e compartilhem recursos.
-
-🔗 *Modelo TCP/IP (4 camadas):*
-1. Interface de Rede → transmissão física
-2. Internet → roteamento via IP
-3. Transporte → TCP (confiável) ou UDP (rápido)
-4. Aplicação → HTTP, DNS, FTP
-
-🌍 *Tipos:* LAN (local) e WAN (longa distância)
-
-🛠️ *Equipamentos:*
-• Roteador: encaminha pacotes entre redes
-• Switch: conecta dispositivos na mesma rede
-
-📡 *DNS:* traduz nomes (google.com) em endereços IP`,
-    pergunta: '❓ Qual a diferença entre TCP e UDP? Quando usar cada um?',
-    flashcards: [
-      { p: 'Quantas camadas tem o modelo TCP/IP?', r: '4 camadas: Interface de Rede, Internet, Transporte e Aplicação.' },
-      { p: 'O que faz o DNS?', r: 'Traduz nomes de domínio (ex: google.com) em endereços IP.' },
-      { p: 'Diferença entre roteador e switch?', r: 'Roteador conecta redes diferentes. Switch conecta dispositivos na mesma rede.' },
+    num: '04', titulo: 'Redes de Computadores',
+    conceitos: ['TCP/IP: 4 camadas (Interface, Internet, Transporte, Aplicação)', 'LAN (local) vs WAN (longa distância)', 'Roteador encaminha entre redes; Switch conecta na mesma rede; DNS resolve nomes'],
+    revisao: ['Quais são as 4 camadas do modelo TCP/IP?', 'Qual a diferença entre roteador e switch?', 'O que faz o protocolo DNS?'],
+    teste: [
+      { p: 'O protocolo TCP garante:', a: ['A) Velocidade máxima de transmissão', 'B) Entrega confiável e ordenada dos dados ✅', 'C) Conexão sem fio'] },
+      { p: 'LAN significa:', a: ['A) Long Area Network', 'B) Local Area Network ✅', 'C) Linked Access Node'] },
     ],
   },
   {
-    titulo: '⚙️ Sistemas Operacionais I',
-    modulo: 'Módulo I',
-    resumo: `O SO é o intermediário entre hardware e programas.
-
-🔄 *Escalonamento de processos:*
-• Round Robin: cada processo recebe fatias iguais de tempo
-• SJF (Shortest Job First): prioriza processos mais curtos
-
-💾 *Gerenciamento de memória:*
-• Memória virtual: cada processo tem seu próprio espaço
-• Tabelas de páginas: isolam processos, evitando crashes em cascata
-
-🚀 *Bootstrap:* rotina em ROM carrega o núcleo do SO para a RAM ao ligar o computador.`,
-    pergunta: '❓ O que é escalonamento de processos e por que ele é necessário?',
-    flashcards: [
-      { p: 'O que é Round Robin?', r: 'Algoritmo de escalonamento que dá fatias iguais de CPU para cada processo.' },
-      { p: 'O que é memória virtual?', r: 'Técnica que dá a cada processo seu próprio espaço de endereço, isolando-os.' },
-      { p: 'O que é bootstrap?', r: 'Processo de inicialização que carrega o SO da memória persistente para a RAM.' },
+    num: '05', titulo: 'Sistemas Operacionais I',
+    conceitos: ['SO gerencia hardware e software', 'Escalonamento: Round Robin (fatias iguais), SJF (mais curto primeiro)', 'Memória virtual + tabelas de páginas isolam processos'],
+    revisao: ['Qual a função principal do sistema operacional?', 'Como funciona o algoritmo Round Robin?', 'O que é memória virtual?'],
+    teste: [
+      { p: 'O escalonamento Round Robin:', a: ['A) Prioriza processos mais longos', 'B) Dá fatias iguais de CPU para cada processo ✅', 'C) Executa apenas um processo por vez'] },
+      { p: 'Memória virtual serve para:', a: ['A) Aumentar a velocidade do HD', 'B) Isolar processos e ampliar o espaço de endereçamento ✅', 'C) Substituir a memória cache'] },
     ],
   },
   {
-    titulo: '📱 Softwares Aplicativos',
-    modulo: 'Módulo I',
-    resumo: `Softwares aplicativos entregam valor direto ao usuário final.
-
-📋 *Categorias:*
-• Produtividade: Word, Excel, navegadores
-• Comunicação: e-mail, videoconferência
-• ERP: integra todos os departamentos da empresa (RH, financeiro, estoque)
-• Sistemas específicos: hospital, escola, loja
-
-💡 *Software de prateleira vs sob medida:*
-• Prateleira: pronto, mais barato, menos personalizado
-• Sob medida: desenvolvido para a empresa, mais caro, mais adequado`,
-    pergunta: '❓ O que é um ERP e qual problema ele resolve nas empresas?',
-    flashcards: [
-      { p: 'O que significa ERP?', r: 'Enterprise Resource Planning — sistema que integra todos os departamentos da empresa.' },
-      { p: 'Qual a vantagem do software sob medida?', r: 'É desenvolvido especificamente para as necessidades da empresa, mais adequado.' },
-      { p: 'Cite 3 exemplos de software de produtividade.', r: 'Word, Excel, Google Docs, PowerPoint, navegadores.' },
+    num: '06', titulo: 'Softwares Aplicativos',
+    conceitos: ['Produtividade: Word, Excel, navegadores', 'ERP integra todos os departamentos da empresa', 'Software de prateleira (pronto) vs sob medida (personalizado)'],
+    revisao: ['O que é um ERP e qual problema ele resolve?', 'Qual a vantagem do software sob medida?', 'Cite 3 exemplos de software de produtividade.'],
+    teste: [
+      { p: 'ERP significa:', a: ['A) Electronic Resource Program', 'B) Enterprise Resource Planning ✅', 'C) Extended Runtime Platform'] },
+      { p: 'Software de prateleira é:', a: ['A) Desenvolvido sob medida para a empresa', 'B) Produto pronto para uso geral ✅', 'C) Software de código aberto'] },
     ],
   },
   {
-    titulo: '🔍 Tópicos Especiais — IA e Cloud',
-    modulo: 'Módulo I',
-    resumo: `A vanguarda tecnológica atual é definida por IA e Cloud Computing.
-
-☁️ *Modelos de serviço Cloud:*
-• IaaS: aluga servidores e rede (ex: AWS EC2)
-• PaaS: ambiente de desenvolvimento pronto (ex: Heroku)
-• SaaS: software via internet (ex: Gmail, Google Docs)
-
-🔒 *Responsabilidade compartilhada:*
-• Provedor: protege a infraestrutura física
-• Cliente: protege seus dados e aplicações
-
-🤖 *IA:* Machine Learning aprende com dados para fazer previsões e automações.`,
-    pergunta: '❓ Qual a diferença entre IaaS, PaaS e SaaS? Dê um exemplo real de cada.',
-    flashcards: [
-      { p: 'O que é SaaS?', r: 'Software como Serviço — você usa o software pela internet sem instalar nada. Ex: Gmail.' },
-      { p: 'O que é IaaS?', r: 'Infraestrutura como Serviço — aluga servidores virtuais na nuvem. Ex: AWS EC2.' },
-      { p: 'O que é responsabilidade compartilhada na nuvem?', r: 'Provedor protege a infraestrutura; cliente protege seus dados e aplicações.' },
+    num: '07', titulo: 'Tópicos Especiais — IA e Cloud',
+    conceitos: ['IaaS (servidores), PaaS (plataforma), SaaS (software) na nuvem', 'Responsabilidade compartilhada: provedor protege infraestrutura, cliente protege dados', 'IA: Machine Learning aprende com dados'],
+    revisao: ['Qual a diferença entre IaaS, PaaS e SaaS?', 'O que é responsabilidade compartilhada na nuvem?', 'Dê um exemplo real de SaaS.'],
+    teste: [
+      { p: 'Gmail é um exemplo de:', a: ['A) IaaS', 'B) PaaS', 'C) SaaS ✅'] },
+      { p: 'Na nuvem, quem protege os dados do cliente?', a: ['A) O provedor de nuvem', 'B) O próprio cliente ✅', 'C) O governo'] },
     ],
   },
   {
-    titulo: '🤖 Elementos de Automação',
-    modulo: 'Módulo II',
-    resumo: `Automação reduz a intervenção humana em processos repetitivos ou perigosos.
-
-🔌 *Componentes:*
-• Sensores: captam variáveis (temperatura, pressão, presença)
-• Atuadores: executam ações físicas (motores, válvulas)
-• CLP: o "cérebro" do sistema, processa lógica Ladder
-
-📊 *SCADA:* supervisão em tempo real de processos industriais à distância.
-
-🔄 *Exemplo:* sensor detecta peça → CLP processa → atuador move o braço robótico`,
-    pergunta: '❓ Qual a função do CLP em um sistema de automação industrial?',
-    flashcards: [
-      { p: 'O que é um sensor?', r: 'Dispositivo que capta variáveis do ambiente (temperatura, pressão, presença).' },
-      { p: 'O que é CLP?', r: 'Controlador Lógico Programável — processa lógica e controla atuadores industriais.' },
-      { p: 'O que é SCADA?', r: 'Sistema de supervisão e aquisição de dados em tempo real para processos industriais.' },
+    num: '08', titulo: 'Elementos de Automação',
+    conceitos: ['Sensores captam variáveis (temperatura, pressão, presença)', 'Atuadores executam ações físicas (motores, válvulas)', 'CLP processa lógica Ladder; SCADA supervisiona em tempo real'],
+    revisao: ['Qual a função de um sensor em automação?', 'O que é um CLP?', 'Para que serve o sistema SCADA?'],
+    teste: [
+      { p: 'O CLP em automação industrial é:', a: ['A) Um tipo de sensor de temperatura', 'B) O controlador que processa a lógica do sistema ✅', 'C) Um atuador hidráulico'] },
+      { p: 'SCADA serve para:', a: ['A) Programar CLPs', 'B) Supervisionar processos em tempo real ✅', 'C) Instalar sensores'] },
     ],
   },
   {
-    titulo: '🧩 Engenharia de Software',
-    modulo: 'Módulo II',
-    resumo: `Engenharia de Software cria sistemas organizados, eficientes e sustentáveis.
-
-📜 *Manifesto Ágil:* pessoas, software funcionando, colaboração e adaptação a mudanças.
-
-🔄 *Frameworks:*
-• Scrum: sprints de 1-4 semanas, backlog priorizado
-• Kanban: fluxo contínuo, colunas (A fazer / Fazendo / Feito)
-
-🏗️ *SOLID (5 princípios):*
-• S: uma responsabilidade por classe
-• O: aberto para extensão, fechado para modificação
-• L: subclasses substituem a classe pai
-• I: interfaces específicas
-• D: dependa de abstrações`,
-    pergunta: '❓ Explique o princípio S do SOLID com um exemplo prático.',
-    flashcards: [
-      { p: 'O que é Scrum?', r: 'Framework ágil com sprints curtos, backlog e reuniões diárias para desenvolvimento iterativo.' },
-      { p: 'O que significa o S do SOLID?', r: 'Single Responsibility — cada classe deve ter apenas uma responsabilidade.' },
-      { p: 'Diferença entre Scrum e Kanban?', r: 'Scrum usa sprints com prazo fixo. Kanban é fluxo contínuo sem iterações.' },
+    num: '09', titulo: 'Engenharia de Software',
+    conceitos: ['Manifesto Ágil: pessoas, software funcionando, colaboração, adaptação', 'Scrum: sprints + backlog; Kanban: fluxo contínuo', 'SOLID: S(responsabilidade única) O(aberto/fechado) L(Liskov) I(interfaces) D(inversão)'],
+    revisao: ['O que prioriza o Manifesto Ágil?', 'Qual a diferença entre Scrum e Kanban?', 'O que significa o S do SOLID?'],
+    teste: [
+      { p: 'Scrum usa:', a: ['A) Fluxo contínuo sem iterações', 'B) Sprints com prazo fixo ✅', 'C) Apenas documentação'] },
+      { p: 'O princípio S do SOLID significa:', a: ['A) Segurança do código', 'B) Single Responsibility — uma responsabilidade por classe ✅', 'C) Sincronização de dados'] },
     ],
   },
   {
-    titulo: '📊 Gerência de Projetos em TI',
-    modulo: 'Módulo II',
-    resumo: `Gerenciar projetos é equilibrar prazo, custo e escopo sem perder qualidade.
-
-📐 *Triângulo de restrições:*
-Prazo ↔ Custo ↔ Escopo — mudar um afeta os outros dois.
-
-🔄 *Scrum na prática:*
-Sprint Planning → Daily Scrum → Sprint Review → Retrospectiva
-
-🚀 *CI/CD:* automatiza testes e deploy, garantindo que código novo não quebre o sistema.
-
-👥 *Stakeholders:* todas as partes interessadas (cliente, equipe, gestores).`,
-    pergunta: '❓ O que é o triângulo de restrições e como ele afeta as decisões de um projeto?',
-    flashcards: [
-      { p: 'O que é CI/CD?', r: 'Integração e Entrega Contínua — automatiza testes e deploy de código.' },
-      { p: 'Quem são os stakeholders?', r: 'Todas as partes interessadas no projeto: cliente, equipe, gestores, usuários.' },
-      { p: 'O que acontece se aumentar o escopo sem mudar prazo/custo?', r: 'A qualidade cai — é a lei do triângulo de restrições.' },
+    num: '10', titulo: 'Gerência de Projetos em TI',
+    conceitos: ['Triângulo: Prazo ↔ Custo ↔ Escopo (mudar um afeta os outros)', 'Scrum: Planning → Daily → Review → Retrospectiva', 'CI/CD automatiza testes e deploy'],
+    revisao: ['O que é o triângulo de restrições?', 'Quais são as 4 cerimônias do Scrum?', 'O que significa CI/CD?'],
+    teste: [
+      { p: 'Se aumentar o escopo sem mudar prazo/custo:', a: ['A) A qualidade melhora automaticamente', 'B) A qualidade tende a cair ✅', 'C) O projeto fica mais barato'] },
+      { p: 'CI/CD significa:', a: ['A) Controle Interno e Controle de Dados', 'B) Integração Contínua e Entrega Contínua ✅', 'C) Código Integrado e Deploy'] },
     ],
   },
   {
-    titulo: '⚡ Introdução à Eletrônica',
-    modulo: 'Módulo II',
-    resumo: `A eletrônica é a base física de todo o hardware.
-
-⚡ *Lei de Ohm:* V = R × I
-• Tensão (V): "pressão" elétrica
-• Corrente (I): fluxo de elétrons
-• Resistência (R): oposição ao fluxo
-
-🔬 *Semicondutores:*
-• Transistor: interruptor eletrônico, base dos processadores
-• Diodo: permite corrente em apenas uma direção
-
-🔢 *Digital:* opera com 0 e 1. Portas lógicas (AND, OR, NOT) são feitas com transistores.`,
-    pergunta: '❓ O que é um transistor e qual seu papel nos processadores modernos?',
-    flashcards: [
-      { p: 'Qual a fórmula da Lei de Ohm?', r: 'V = R × I (Tensão = Resistência × Corrente).' },
-      { p: 'O que faz um transistor?', r: 'Funciona como interruptor eletrônico — base dos processadores e circuitos digitais.' },
-      { p: 'O que é eletrônica digital?', r: 'Opera com apenas dois estados: 0 (desligado) e 1 (ligado).' },
+    num: '11', titulo: 'Introdução à Eletrônica',
+    conceitos: ['Lei de Ohm: V = R × I (Tensão = Resistência × Corrente)', 'Transistor: interruptor eletrônico, base dos processadores', 'Digital: opera com 0 e 1; portas lógicas feitas com transistores'],
+    revisao: ['Qual a fórmula da Lei de Ohm?', 'O que faz um transistor em um circuito?', 'O que é eletrônica digital?'],
+    teste: [
+      { p: 'A Lei de Ohm é:', a: ['A) V = R + I', 'B) V = R × I ✅', 'C) V = R / I'] },
+      { p: 'Transistores são usados para:', a: ['A) Armazenar dados permanentemente', 'B) Funcionar como interruptores eletrônicos ✅', 'C) Transmitir sinais de rádio'] },
     ],
   },
   {
-    titulo: '🚀 Planejamento Estratégico e Empreendedorismo',
-    modulo: 'Módulo II',
-    resumo: `Sucesso tecnológico depende de alinhar inovação com estratégia de negócio.
-
-🔍 *Análise SWOT:*
-• Forças e Fraquezas (internas)
-• Oportunidades e Ameaças (externas)
-
-📋 *Business Model Canvas:* 9 blocos descrevem como o negócio cria e captura valor.
-
-🚀 *Lean Startup:*
-• MVP: versão mínima para testar a ideia
-• Ciclo: Construir → Medir → Aprender → Ajustar`,
-    pergunta: '❓ O que é MVP e por que ele é importante na metodologia Lean Startup?',
-    flashcards: [
-      { p: 'O que é SWOT?', r: 'Análise de Forças, Fraquezas, Oportunidades e Ameaças de um negócio.' },
-      { p: 'O que é MVP?', r: 'Produto Mínimo Viável — versão básica para validar a ideia com o mínimo de investimento.' },
-      { p: 'O que é Business Model Canvas?', r: '9 blocos que descrevem como um negócio cria, entrega e captura valor.' },
+    num: '12', titulo: 'Planejamento Estratégico e Empreendedorismo',
+    conceitos: ['SWOT: Forças, Fraquezas (internas) + Oportunidades, Ameaças (externas)', 'Business Model Canvas: 9 blocos de como o negócio cria valor', 'Lean Startup: MVP → Construir → Medir → Aprender → Ajustar'],
+    revisao: ['O que analisa a matriz SWOT?', 'O que é MVP na metodologia Lean Startup?', 'Para que serve o Business Model Canvas?'],
+    teste: [
+      { p: 'SWOT analisa:', a: ['A) Apenas fatores externos do mercado', 'B) Fatores internos e externos do negócio ✅', 'C) Apenas a concorrência'] },
+      { p: 'MVP significa:', a: ['A) Modelo de Valor Permanente', 'B) Produto Mínimo Viável ✅', 'C) Máximo Valor Possível'] },
     ],
   },
   {
-    titulo: '⚠️ Segurança do Trabalho',
-    modulo: 'Módulo II',
-    resumo: `A saúde do profissional de TI é protegida por normas de ergonomia.
-
-📋 *NR-17:* adapta o trabalho às características físicas e psicológicas do trabalhador.
-
-🖥️ *Ergonomia para TI:*
-• Monitor na altura dos olhos, 50-70cm de distância
-• Cadeira com apoio lombar, pés no chão
-• Pausa a cada 50 minutos
-
-⚠️ *LER/DORT:* lesões por esforço repetitivo — causadas por digitação excessiva e má postura.
-
-🏠 *Home Office:* NR-17 se aplica também ao trabalho remoto.`,
-    pergunta: '❓ O que é LER/DORT e quais as principais causas para profissionais de TI?',
-    flashcards: [
-      { p: 'O que é a NR-17?', r: 'Norma Regulamentadora de Ergonomia — define condições adequadas de trabalho.' },
-      { p: 'O que é LER?', r: 'Lesão por Esforço Repetitivo — causada por movimentos repetitivos como digitação excessiva.' },
-      { p: 'De quanto em quanto tempo fazer pausas?', r: 'A cada 50 minutos de trabalho contínuo no computador.' },
+    num: '13', titulo: 'Segurança do Trabalho',
+    conceitos: ['NR-17: adapta o trabalho às características do trabalhador', 'LER/DORT: lesões por esforço repetitivo — digitação excessiva, má postura', 'Pausas a cada 50 minutos; monitor na altura dos olhos a 50-70cm'],
+    revisao: ['O que estabelece a NR-17?', 'O que é LER e quais suas causas?', 'Quais as recomendações ergonômicas para trabalho no computador?'],
+    teste: [
+      { p: 'A NR-17 trata de:', a: ['A) Segurança elétrica em data centers', 'B) Ergonomia e adaptação do trabalho ao trabalhador ✅', 'C) Normas de programação segura'] },
+      { p: 'LER é causada principalmente por:', a: ['A) Exposição a radiação de monitores', 'B) Movimentos repetitivos e má postura ✅', 'C) Uso de equipamentos sem aterramento'] },
     ],
   },
   {
-    titulo: '⚙️ Sistemas Operacionais II',
-    modulo: 'Módulo II',
-    resumo: `Administração profissional de servidores em produção.
-
-🐧 *Linux:*
-• Shell Script: automatiza tarefas (backups, relatórios)
-• chmod/chown: controla permissões de arquivos
-• systemctl: gerencia serviços do sistema
-
-🪟 *Windows Server:*
-• Active Directory: gerencia usuários e computadores da rede
-• GPO: aplica configurações e restrições em massa
-
-🔐 *Segurança:* princípio do menor privilégio — cada usuário tem só o acesso necessário.`,
-    pergunta: '❓ O que é o Active Directory e qual problema ele resolve em empresas?',
-    flashcards: [
-      { p: 'O que é Active Directory?', r: 'Serviço do Windows Server que centraliza gerenciamento de usuários, grupos e políticas.' },
-      { p: 'O que é GPO?', r: 'Group Policy Object — aplica configurações e restrições em massa nos computadores da rede.' },
-      { p: 'O que é o princípio do menor privilégio?', r: 'Cada usuário recebe apenas o acesso mínimo necessário para sua função.' },
+    num: '14', titulo: 'Sistemas Operacionais II',
+    conceitos: ['Linux: Shell Script automatiza tarefas; chmod/chown controla permissões', 'Windows Server: Active Directory gerencia usuários; GPO aplica políticas em massa', 'Princípio do menor privilégio: cada usuário tem só o acesso necessário'],
+    revisao: ['O que é o Active Directory?', 'Para que serve o Shell Script no Linux?', 'O que é o princípio do menor privilégio?'],
+    teste: [
+      { p: 'Active Directory serve para:', a: ['A) Gerenciar arquivos no Linux', 'B) Centralizar usuários, grupos e políticas no Windows Server ✅', 'C) Configurar redes Wi-Fi'] },
+      { p: 'GPO significa:', a: ['A) General Protocol Object', 'B) Group Policy Object ✅', 'C) Global Permission Override'] },
     ],
   },
   {
-    titulo: '🐘 PHP e Laravel',
-    modulo: 'Módulo III',
-    resumo: `PHP é a linguagem backend mais usada na web.
-
-🔧 *PHP 8.x:* tipagem forte, JIT Compiler para melhor performance.
-
-🏗️ *Laravel — framework MVC:*
-• Rotas: define URLs e controladores
-• Eloquent ORM: manipula banco com objetos PHP
-  Ex: User::where('ativo', true)->get()
-• Artisan: CLI para gerar código e rodar migrations
-• Middleware: filtra requisições (autenticação, logs)
-
-📐 *Padrões PSR:* garantem que código PHP de diferentes projetos seja compatível.`,
-    pergunta: '❓ O que é um ORM e qual a vantagem de usar o Eloquent do Laravel?',
-    flashcards: [
-      { p: 'O que é MVC?', r: 'Model-View-Controller — padrão que separa dados, interface e lógica de negócio.' },
-      { p: 'O que é Eloquent ORM?', r: 'Camada do Laravel que permite manipular o banco de dados usando objetos PHP.' },
-      { p: 'O que faz o Artisan?', r: 'CLI do Laravel para gerar código, rodar migrations, criar controllers, etc.' },
+    num: '15', titulo: 'PHP e Laravel',
+    conceitos: ['PHP 8.x: tipagem forte, JIT Compiler para melhor performance', 'Laravel MVC: Rotas, Eloquent ORM, Artisan CLI, Middleware, Blade', 'Padrões PSR garantem compatibilidade entre projetos PHP'],
+    revisao: ['O que é um ORM e como o Eloquent funciona?', 'Quais são os componentes principais do Laravel?', 'O que faz o Artisan no Laravel?'],
+    teste: [
+      { p: 'Eloquent ORM permite:', a: ['A) Criar interfaces gráficas', 'B) Manipular banco de dados usando objetos PHP ✅', 'C) Gerenciar servidores Linux'] },
+      { p: 'MVC significa:', a: ['A) Model-View-Controller ✅', 'B) Module-Version-Code', 'C) Main-Variable-Class'] },
     ],
   },
   {
-    titulo: '🎨 Design UX e Figma',
-    modulo: 'Módulo III',
-    resumo: `UX garante que o produto seja intuitivo e agradável de usar.
-
-🎯 *10 Heurísticas de Nielsen (principais):*
-1. Visibilidade do status do sistema
-2. Correspondência com o mundo real
-3. Controle e liberdade do usuário
-4. Prevenção de erros
-5. Design minimalista
-
-🖌️ *Figma:*
-• Prototipagem de alta fidelidade antes de desenvolver
-• Componentes reutilizáveis (Design System)
-• Colaboração em tempo real
-
-🔄 *Processo UX:* Pesquisa → Wireframe → Protótipo → Teste → Implementação`,
-    pergunta: '❓ Por que é importante testar a usabilidade antes de desenvolver o sistema?',
-    flashcards: [
-      { p: 'O que são as Heurísticas de Nielsen?', r: '10 princípios para avaliar a usabilidade de interfaces de usuário.' },
-      { p: 'O que é prototipagem de alta fidelidade?', r: 'Protótipo visual detalhado que simula o produto final antes do desenvolvimento.' },
-      { p: 'O que é Design System?', r: 'Biblioteca de componentes reutilizáveis que garante consistência visual no produto.' },
+    num: '16', titulo: 'Design UX e Figma',
+    conceitos: ['10 Heurísticas de Nielsen: visibilidade, controle, prevenção de erros, minimalismo...', 'Figma: prototipagem de alta fidelidade, Design System, colaboração em tempo real', 'Processo UX: Pesquisa → Wireframe → Protótipo → Teste → Implementação'],
+    revisao: ['O que são as Heurísticas de Nielsen?', 'Para que serve a prototipagem antes do desenvolvimento?', 'O que é um Design System?'],
+    teste: [
+      { p: 'As Heurísticas de Nielsen são:', a: ['A) Regras de programação segura', 'B) Princípios para avaliar usabilidade de interfaces ✅', 'C) Métricas de performance de banco de dados'] },
+      { p: 'Protótipo de alta fidelidade serve para:', a: ['A) Substituir o desenvolvimento', 'B) Testar a usabilidade antes de desenvolver ✅', 'C) Documentar o código'] },
     ],
   },
   {
-    titulo: '🌐 Programação Web',
-    modulo: 'Módulo III',
-    resumo: `Desenvolvimento web: frontend (o que o usuário vê) + backend (o que processa).
-
-🏗️ *Frontend:*
-• HTML: estrutura e conteúdo
-• CSS: estilo e layout (Flexbox, Grid)
-• JavaScript: interatividade
-
-🔌 *APIs RESTful:*
-• GET: buscar | POST: criar | PUT: atualizar | DELETE: remover
-• Formato padrão: JSON
-
-🔐 *Segurança:*
-• JWT: autenticação stateless
-• OAuth2: login com Google/Facebook
-• HTTPS: criptografia na transmissão`,
-    pergunta: '❓ O que é uma API RESTful e quais os 4 métodos HTTP principais?',
-    flashcards: [
-      { p: 'O que faz o HTML?', r: 'Define a estrutura e o conteúdo da página web.' },
-      { p: 'O que é JWT?', r: 'JSON Web Token — token para autenticação stateless em APIs.' },
-      { p: 'Qual método HTTP é usado para criar dados?', r: 'POST.' },
+    num: '17', titulo: 'Programação Web',
+    conceitos: ['Frontend: HTML (estrutura), CSS (estilo), JavaScript (interatividade)', 'APIs RESTful: GET/POST/PUT/DELETE com JSON', 'Segurança: JWT (autenticação), OAuth2 (autorização), HTTPS (criptografia)'],
+    revisao: ['Qual a função do HTML, CSS e JavaScript?', 'Quais os 4 métodos HTTP de uma API REST?', 'O que é JWT?'],
+    teste: [
+      { p: 'Para criar dados em uma API REST usa-se:', a: ['A) GET', 'B) POST ✅', 'C) DELETE'] },
+      { p: 'JWT é usado para:', a: ['A) Estilizar páginas web', 'B) Autenticação stateless em APIs ✅', 'C) Criar banco de dados'] },
     ],
   },
   {
-    titulo: '🗄️ Banco de Dados',
-    modulo: 'Módulo III',
-    resumo: `Bancos de dados organizam e garantem a integridade das informações.
-
-🔒 *ACID:*
-• Atomicidade: tudo ou nada
-• Consistência: dados sempre válidos
-• Isolação: transações não interferem entre si
-• Durabilidade: dados persistem após falhas
-
-📐 *Normalização:*
-• 1NF: eliminar grupos repetitivos
-• 2NF: eliminar dependências parciais
-• 3NF: eliminar dependências transitivas
-
-📦 *NoSQL:* escalabilidade horizontal, flexível para dados semiestruturados (MongoDB, Firebase).`,
-    pergunta: '❓ O que significa ACID em banco de dados? Explique cada letra.',
-    flashcards: [
-      { p: 'O que é Atomicidade no ACID?', r: 'A transação é tudo ou nada — se falhar no meio, tudo é revertido.' },
-      { p: 'O que a 1NF exige?', r: 'Eliminar grupos repetitivos e garantir que cada campo tenha valor atômico.' },
-      { p: 'Diferença entre SQL e NoSQL?', r: 'SQL: relacional, estruturado, ACID. NoSQL: flexível, escalável horizontalmente.' },
+    num: '18', titulo: 'Banco de Dados',
+    conceitos: ['ACID: Atomicidade, Consistência, Isolação, Durabilidade', 'Normalização: 1NF (grupos repetitivos), 2NF (dependências parciais), 3NF (transitivas)', 'NoSQL: escalabilidade horizontal, flexível (MongoDB, Firebase, Redis)'],
+    revisao: ['O que significa cada letra do ACID?', 'O que a 1NF exige de uma tabela?', 'Quando usar NoSQL em vez de SQL?'],
+    teste: [
+      { p: 'Atomicidade no ACID significa:', a: ['A) Dados sempre válidos', 'B) A transação é tudo ou nada ✅', 'C) Transações isoladas entre si'] },
+      { p: 'NoSQL é ideal para:', a: ['A) Dados altamente estruturados com muitas relações', 'B) Dados semiestruturados com alta escalabilidade ✅', 'C) Relatórios financeiros complexos'] },
     ],
   },
   {
-    titulo: '🧪 Projeto Integrador',
-    modulo: 'Módulo III',
-    resumo: `O Projeto Integrador aplica tudo do curso em um cenário real.
-
-📋 *Etapas:*
-1. Planejamento (SWOT, Canvas)
-2. Levantamento de requisitos
-3. Modelagem do banco (DER, normalização)
-4. Design no Figma (UX/UI)
-5. Desenvolvimento PHP/Laravel + HTML/CSS/JS
-6. Testes e deploy
-
-🎯 *O que é avaliado:*
-• Integração entre disciplinas
-• Qualidade do código (SOLID, Clean Code)
-• Usabilidade (Heurísticas de Nielsen)
-• Documentação e apresentação
-
-💡 Escolha um problema real que você conhece!`,
-    pergunta: '❓ Quais disciplinas do curso são integradas no Projeto Integrador e como elas se conectam?',
-    flashcards: [
-      { p: 'O que é DER?', r: 'Diagrama Entidade-Relacionamento — representa visualmente a estrutura do banco de dados.' },
-      { p: 'O que é Clean Code?', r: 'Conjunto de práticas para escrever código legível, simples e fácil de manter.' },
-      { p: 'Por que escolher um problema real para o projeto?', r: 'Facilita o desenvolvimento, a apresentação e demonstra aplicação prática do conhecimento.' },
+    num: '19', titulo: 'Projeto Integrador',
+    conceitos: ['Une todas as disciplinas: planejamento, banco, backend PHP, design Figma', 'Avalia: integração, qualidade do código (SOLID), usabilidade (Nielsen), documentação', 'Simula cenário real de mercado — escolha um problema real!'],
+    revisao: ['Quais disciplinas são integradas no projeto?', 'O que é avaliado na apresentação?', 'Por que escolher um problema real para o projeto?'],
+    teste: [
+      { p: 'O Projeto Integrador avalia principalmente:', a: ['A) Velocidade de digitação', 'B) Integração prática de todas as disciplinas do curso ✅', 'C) Conhecimento de hardware apenas'] },
+      { p: 'DER significa:', a: ['A) Diagrama de Estrutura de Rede', 'B) Diagrama Entidade-Relacionamento ✅', 'C) Documento de Especificação de Requisitos'] },
     ],
   },
 ];
 
 /**
- * Retorna o tópico pelo índice
+ * Gera mensagem de Conteúdo Novo (08:00)
  */
-function getTopicoPorIndice(indice) {
-  return TOPICOS[indice % TOPICOS.length];
+function gerarConteudoNovo(topico, diaNum) {
+  const conceitos = topico.conceitos.map(c => `• ${c}`).join('\n');
+  return `📚 *Estudo Suporte TI — Dia ${diaNum}*\n\n📘 *Tópico ${topico.num}/19 — ${topico.titulo}*\n\n${conceitos}\n\n💡 _Leia com atenção e tente explicar com suas palavras!_`;
 }
 
 /**
- * Retorna o tópico do dia baseado na data atual (fallback)
+ * Gera mensagem de Revisão Ativa (10:00)
  */
-function getTopicoDoDia() {
-  const hoje = new Date();
-  const diaDoAno = Math.floor((hoje - new Date(hoje.getFullYear(), 0, 0)) / 86400000);
-  return TOPICOS[diaDoAno % TOPICOS.length];
+function gerarRevisaoAtiva(topico, diaNum) {
+  const perguntas = topico.revisao.map((p, i) => `${i + 1}. ${p}`).join('\n');
+  return `📚 *Estudo Suporte TI — Dia ${diaNum}*\n\n🧠 *Revisão — Tópico ${topico.num}/19 — ${topico.titulo}*\n\n${perguntas}\n\n_Responda aqui para eu avaliar!_ 💪`;
 }
 
 /**
- * Monta mensagem completa: revisão anterior + resumo novo + pergunta
+ * Gera mensagem de Mini Teste (14:00)
  */
-function montarMensagemCompleta(indiceAtual) {
-  const total = TOPICOS.length;
-  const topico = TOPICOS[indiceAtual];
-  const indicePrev = (indiceAtual - 1 + total) % total;
-  const topicoPrev = TOPICOS[indicePrev];
-
-  // Flashcard aleatório do tópico anterior para revisão
-  const flashcards = topicoPrev.flashcards;
-  const fc = flashcards[Math.floor(Math.random() * flashcards.length)];
-
-  return `🔁 *Revisão rápida — ${topicoPrev.titulo}*\n❓ ${fc.p}\n✅ ${fc.r}\n\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `📚 *Tópico ${indiceAtual + 1}/${total} — ${topico.titulo}*\n${topico.modulo}\n\n` +
-    `${topico.resumo}\n\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `${topico.pergunta}\n\n_Responda aqui para eu avaliar!_ 💪`;
+function gerarMiniTeste(topico, diaNum) {
+  const questoes = topico.teste.map((q, i) => {
+    const alternativas = q.a.join('\n');
+    return `*${i + 1}.* ${q.p}\n${alternativas}`;
+  }).join('\n\n');
+  return `📚 *Estudo Suporte TI — Dia ${diaNum}*\n\n⚡ *Mini Teste — Tópico ${topico.num}/19 — ${topico.titulo}*\n\n${questoes}\n\n_Responda com o número e a letra! Ex: 1-B, 2-A_`;
 }
 
 /**
- * Avalia a resposta de Ricardo usando a IA
+ * Gera mensagem de Revisão Geral (20:00)
  */
-async function avaliarResposta(historico, indiceAtual) {
-  const topico = TOPICOS[indiceAtual % TOPICOS.length];
-  const systemPrompt = `Você é um tutor de TI ajudando Ricardo a estudar para o curso técnico.
-Tópico atual: ${topico.titulo}
-Resumo do tópico: ${topico.resumo}
+function gerarRevisaoGeral(topicosHoje, diaNum) {
+  const resumos = topicosHoje.map(t =>
+    `📌 *Tópico ${t.num}* — ${t.titulo}\n${t.conceitos[0]}`
+  ).join('\n\n');
+  return `📚 *Estudo Suporte TI — Dia ${diaNum}*\n\n🔁 *Revisão Geral do Dia*\n\n${resumos}\n\n✅ _Parabéns pelo estudo de hoje! Amanhã tem mais._ 🚀`;
+}
 
-Quando Ricardo responder a pergunta de fixação:
-- Avalie se a resposta está correta, parcialmente correta ou incorreta
-- Complemente com o que faltou de forma didática
-- Seja encorajador — errar faz parte do aprendizado
-- Máximo 6 linhas
-- Use emojis com moderação
-- Responda em português brasileiro`;
+/**
+ * Gera a mensagem correta baseada no tipo e tópicos do dia
+ */
+async function gerarMensagemEstudo(tipo, indicesTopicos, diaNum, ciclo) {
+  const topicosHoje = indicesTopicos.map(i => TOPICOS[i % TOPICOS.length]);
+  // Para conteúdo/revisão/teste usa o primeiro tópico do dia
+  const topico = topicosHoje[0];
+
+  switch (tipo) {
+    case 'conteudo': return gerarConteudoNovo(topico, diaNum);
+    case 'revisao':  return gerarRevisaoAtiva(topico, diaNum);
+    case 'teste':    return gerarMiniTeste(topico, diaNum);
+    case 'geral':    return gerarRevisaoGeral(topicosHoje, diaNum);
+    default:         return gerarConteudoNovo(topico, diaNum);
+  }
+}
+
+/**
+ * Avalia resposta do usuário usando a IA
+ */
+async function avaliarResposta(historico, indiceTopico) {
+  const topico = TOPICOS[indiceTopico % TOPICOS.length];
+  const systemPrompt = `Você é um tutor de Suporte TI ajudando Ricardo a estudar.
+Tópico atual: ${topico.num}/19 — ${topico.titulo}
+Conceitos: ${topico.conceitos.join('; ')}
+
+Avalie a resposta de Ricardo:
+- Diga se está correto, parcialmente correto ou incorreto
+- Complemente com o que faltou
+- Seja encorajador e didático
+- Máximo 5 linhas
+- Português brasileiro`;
 
   return _gerarResposta(systemPrompt, historico);
 }
 
-module.exports = { TOPICOS, getTopicoPorIndice, getTopicoDoDia, montarMensagemCompleta, avaliarResposta };
+function getTopicoPorIndice(i) { return TOPICOS[i % TOPICOS.length]; }
+
+module.exports = { TOPICOS, gerarMensagemEstudo, avaliarResposta, getTopicoPorIndice };
