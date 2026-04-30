@@ -20,11 +20,12 @@
  * Ao terminar tópico 19, volta para tópico 01.
  */
 
-const { enviarMensagem } = require('./whatsappService');
+const { enviarMensagem } = require('./telegramService');
 const { db } = require('../config/firebase');
 const { gerarMensagemEstudo } = require('./studyService');
 
-const NUMERO = process.env.STUDY_NUMERO || '5521986925971';
+// chat_id do Telegram que recebe as mensagens diárias de estudo
+const CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
 const OWNER_UID = process.env.BLOQUINHO_OWNER_UID || 'avQGpnMx29ZO7NtdRjvUHLEGhAL2';
 
 // Horários de envio em UTC (BRT = UTC-3)
@@ -41,12 +42,12 @@ const HORARIOS = [
 
 // Tópicos por dia da semana (0=dom ignorado, 1=seg...6=sáb)
 const TOPICOS_POR_DIA = {
-  1: [0, 1, 2, 3, 4],       // seg: tópicos 01-05
-  2: [5, 6, 7, 8],           // ter: tópicos 06-09
-  3: [9, 10, 11],            // qua: tópicos 10-12
-  4: [12, 13, 14],           // qui: tópicos 13-15
-  5: [15, 16, 17],           // sex: tópicos 16-18
-  6: [18],                   // sáb: tópico 19
+  1: [0, 1, 2, 3, 4],
+  2: [5, 6, 7, 8],
+  3: [9, 10, 11],
+  4: [12, 13, 14],
+  5: [15, 16, 17],
+  6: [18],
 };
 
 const estadoRef = () => db.collection('users').doc(OWNER_UID)
@@ -85,6 +86,10 @@ function iniciarScheduler() {
   schedulerAtivo = true;
   console.log('[Scheduler] Agente de Estudo iniciado — seg-sáb 08h/10h/14h/20h BRT');
 
+  if (!CHAT_ID) {
+    console.warn('[Scheduler] TELEGRAM_CHAT_ID não configurado — mensagens de estudo não serão enviadas.');
+  }
+
   setInterval(async () => {
     if (!isDiaEstudo()) return;
     const horario = getHorarioAtual();
@@ -97,7 +102,7 @@ function iniciarScheduler() {
       const diaNumero = Object.keys(TOPICOS_POR_DIA).indexOf(String(diaSemana)) + 1;
 
       const mensagem = await gerarMensagemEstudo(horario.tipo, topicosHoje, diaNumero, estado.ciclo || 1);
-      await enviarMensagem(NUMERO, mensagem);
+      await enviarMensagem(CHAT_ID, mensagem);
       console.log(`[Scheduler] Enviado: ${horario.tipo} | Dia ${diaNumero} | Tópicos: ${topicosHoje.map(i => i + 1).join(',')}`);
 
       // No último horário do sábado (tópico 19), reinicia o ciclo

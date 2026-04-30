@@ -1,10 +1,11 @@
-const { extrairDadosWebhook, enviarMensagem } = require('../services/whatsappService');
+const { extrairDadosWebhook, enviarMensagem } = require('../services/telegramService');
 const { gerarResposta } = require('../services/openaiService');
 const { buscarConversa, salvarMensagem, detectarIntencao } = require('../services/conversationService');
 const { avaliarResposta } = require('../services/studyService');
 const { db } = require('../config/firebase');
 
-const NUMERO_RICARDO = process.env.STUDY_NUMERO || '5521986925971';
+// chat_id do dono — recebe as mensagens do scheduler e tem modo estudo ativo
+const CHAT_ID_DONO = process.env.TELEGRAM_CHAT_ID || '';
 const OWNER_UID = process.env.BLOQUINHO_OWNER_UID || 'avQGpnMx29ZO7NtdRjvUHLEGhAL2';
 
 async function getIndiceEstudo() {
@@ -12,7 +13,6 @@ async function getIndiceEstudo() {
     const doc = await db.collection('users').doc(OWNER_UID)
       .collection('agent_context').doc('study_scheduler').get();
     if (!doc.exists) return 0;
-    // O índice salvo é o PRÓXIMO a enviar, então o atual é o anterior
     const proximo = doc.data().indiceAtual || 0;
     const { TOPICOS } = require('../services/studyService');
     return (proximo - 1 + TOPICOS.length) % TOPICOS.length;
@@ -21,41 +21,41 @@ async function getIndiceEstudo() {
   }
 }
 
-// Anti-spam
+// Anti-spam por chat_id
 const ultimaMensagem = new Map();
 const INTERVALO_MINIMO_MS = 2000;
 
 async function receberMensagem(req, res) {
-  res.status(200).json({ status: 'recebido' });
+  // Telegram exige resposta 200 rápida para não reenviar o update
+  res.status(200).json({ ok: true });
 
   try {
     const dados = extrairDadosWebhook(req.body);
     if (!dados) return;
 
-    const { numero, mensagem } = dados;
+    const { chatId, mensagem } = dados;
 
+    // Anti-spam
     const agora = Date.now();
-    const ultima = ultimaMensagem.get(numero) || 0;
+    const ultima = ultimaMensagem.get(chatId) || 0;
     if (agora - ultima < INTERVALO_MINIMO_MS) {
-      console.log(`[Webhook] Anti-spam: ignorando mensagem de ${numero}`);
+      console.log(`[Webhook] Anti-spam: ignorando mensagem de ${chatId}`);
       return;
     }
-    ultimaMensagem.set(numero, agora);
+    ultimaMensagem.set(chatId, agora);
 
-    console.log(`[Webhook] Processando mensagem de ${numero}...`);
-    const conversa = await buscarConversa(numero);
+    console.log(`[Webhook] Processando mensagem de chat_id ${chatId}...`);
+    const conversa = await buscarConversa(chatId);
     const historico = conversa.historico || [];
-
     const intencao = detectarIntencao(mensagem);
-    console.log(`[Webhook] Intencao para ${numero}: ${intencao}`);
+
+    console.log(`[Webhook] Intenção para ${chatId}: ${intencao}`);
 
     const historicoAtual = [...historico, { role: 'user', content: mensagem }];
 
-    console.log(`[Webhook] Gerando resposta IA para ${numero}...`);
-
-    // Modo estudo: se for o número do Ricardo, IA avalia respostas de estudo
+    // Modo estudo: se for o chat do dono e status 'estudando', avalia resposta
     let resposta;
-    if (numero === NUMERO_RICARDO && conversa.status === 'estudando') {
+    if (chatId === CHAT_ID_DONO && conversa.status === 'estudando') {
       const indice = await getIndiceEstudo();
       resposta = await avaliarResposta(historicoAtual, indice);
     } else {
@@ -63,14 +63,14 @@ async function receberMensagem(req, res) {
     }
 
     const novoStatus = determinarStatus(intencao, conversa.status);
-    await salvarMensagem(numero, mensagem, resposta, novoStatus);
-    console.log(`[Webhook] Historico salvo para ${numero}`);
+    await salvarMensagem(chatId, mensagem, resposta, novoStatus);
+    console.log(`[Webhook] Histórico salvo para ${chatId}`);
 
-    await enviarMensagem(numero, resposta);
-    console.log(`[Webhook] Ciclo completo para ${numero}`);
+    await enviarMensagem(chatId, resposta);
+    console.log(`[Webhook] Ciclo completo para ${chatId}`);
 
   } catch (error) {
-    console.error(`[Webhook] ERRO CRITICO: ${error.message}`);
+    console.error(`[Webhook] ERRO CRÍTICO: ${error.message}`);
   }
 }
 

@@ -1,5 +1,5 @@
 const { listarConversas } = require('../services/conversationService');
-const { enviarMensagem } = require('../services/whatsappService');
+const { enviarMensagem } = require('../services/telegramService');
 
 /**
  * Lista todas as conversas para o painel administrativo
@@ -15,18 +15,19 @@ async function listar(req, res) {
 }
 
 /**
- * Envio manual de mensagem (uso administrativo)
+ * Envio manual de mensagem via Telegram (uso administrativo)
+ * Body: { chatId: "123456789", mensagem: "texto" }
  */
 async function enviarManual(req, res) {
   try {
-    const { numero, mensagem } = req.body;
+    const { chatId, mensagem } = req.body;
 
-    if (!numero || !mensagem) {
-      return res.status(400).json({ erro: 'Campos "numero" e "mensagem" são obrigatórios' });
+    if (!chatId || !mensagem) {
+      return res.status(400).json({ erro: 'Campos "chatId" e "mensagem" são obrigatórios' });
     }
 
-    await enviarMensagem(numero, mensagem);
-    res.status(200).json({ status: 'enviado', numero });
+    await enviarMensagem(chatId, mensagem);
+    res.status(200).json({ status: 'enviado', chatId });
   } catch (error) {
     console.error('[Conversations] Erro ao enviar manual:', error.message);
     res.status(500).json({ erro: 'Falha ao enviar mensagem' });

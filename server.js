@@ -3,6 +3,7 @@ console.log('[System] Iniciando aplicação Agentia...');
 
 const express = require('express');
 const routes = require('./routes');
+const { registrarWebhook } = require('./services/telegramService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Log de requisições em desenvolvimento/produção
+// Log de requisições
 app.use((req, res, next) => {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${req.method} ${req.path}`);
@@ -23,19 +24,23 @@ app.use((req, res, next) => {
 
 // Versão do deploy
 app.get('/version', (req, res) => {
-  res.json({ version: '2.0.0', fix: 'JID-limpo+evento-case-insensitive', deployedAt: new Date().toISOString() });
+  res.json({
+    version: '3.0.0',
+    platform: 'telegram',
+    deployedAt: new Date().toISOString(),
+  });
 });
 
-// Endpoint de Debug — apenas em ambiente de desenvolvimento
+// Endpoint de Debug — apenas fora de produção
 if (process.env.NODE_ENV !== 'production') {
   app.get('/debug-vars', (req, res) => {
     res.json({
       status: 'online',
-      evolution_url: process.env.EVOLUTION_API_URL || 'não configurada',
-      instance: process.env.EVOLUTION_INSTANCE || 'não configurada',
+      has_telegram_token: !!process.env.TELEGRAM_BOT_TOKEN,
+      telegram_chat_id: process.env.TELEGRAM_CHAT_ID || 'não configurado',
       has_groq_key: !!process.env.GROQ_API_KEY,
       has_firebase_project: !!process.env.FIREBASE_PROJECT_ID,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   });
 }
@@ -46,6 +51,14 @@ app.use('/', routes);
 // Inicia scheduler de estudo
 const { iniciarScheduler } = require('./services/schedulerService');
 iniciarScheduler();
+
+// Registra webhook do Telegram automaticamente se a URL pública estiver configurada
+const WEBHOOK_URL = process.env.WEBHOOK_URL;
+if (WEBHOOK_URL) {
+  registrarWebhook(`${WEBHOOK_URL}/webhook`);
+} else {
+  console.warn('[Telegram] WEBHOOK_URL não configurada — registre o webhook manualmente.');
+}
 
 // Tratamento de rotas não encontradas
 app.use((req, res) => {
@@ -60,9 +73,8 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Agentia rodando na porta ${PORT}`);
-  console.log(`📡 Instância: ${process.env.EVOLUTION_INSTANCE || 'não definida'}`);
-  console.log(`🔗 URL API: ${process.env.EVOLUTION_API_URL || 'não definida'}`);
+  console.log(`🤖 Plataforma: Telegram`);
+  console.log(`📬 Chat ID destino: ${process.env.TELEGRAM_CHAT_ID || 'não configurado'}`);
 });
 
 module.exports = app;
-
